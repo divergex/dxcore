@@ -18,15 +18,18 @@ mkdir build && cd build
 
 Installing conan dependencies:
 ```bash
-conan install .. --build=missing -of .;
+conan install . --output-folder=build --build=missing
 ```
 
 Configuring toolchain
 ```bash
-cmake .. -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(pwd)
+cd build/
+cmake .. -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
 ```
 
-Building
+Building and executing
 ```bash
 cmake --build . -- -j$(nproc)
+./MarketData
 ```
+
