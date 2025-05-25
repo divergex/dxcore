@@ -7,23 +7,26 @@ This project demonstrates the use of SYCL, ZeroMQ, and QuickFIX to receive and p
 
 Ensure the following are installed and set up:
 
-### 1. **vcpkg** (C++ package manager)
-- Install **vcpkg**:
-  Follow the [vcpkg installation guide](https://github.com/microsoft/vcpkg/blob/master/docs/index.md) to set up vcpkg on your system.
+### Development
 
-### 2. **Dependencies**:
-- **SYCL** (DPC++ or other SYCL implementations)
-- **ZeroMQ**
-- **QuickFIX**
-
-To install the required libraries via **vcpkg**, use the following commands:
-
+Configuring build
 ```bash
-# Install SYCL (Intel DPC++ example, adjust for your specific SYCL version)
-vcpkg install intel-dpcpp
+git clone git@github.com:divergex/dxcore
+cd dxcore
+mkdir build && cd build
+```
 
-# Install ZeroMQ
-vcpkg install zeromq
+Installing conan dependencies:
+```bash
+conan install .. --build=missing -of .;
+```
 
-# Install QuickFIX
-vcpkg install quickfix
+Configuring toolchain
+```bash
+cmake .. -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(pwd)
+```
+
+Building
+```bash
+cmake --build . -- -j$(nproc)
+```

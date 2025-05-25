@@ -1,28 +1,41 @@
-cmake_minimum_required(VERSION 3.10)
-project(dxcore)
+cmake_minimum_required(VERSION 3.15)
+
+# Force use of Intel DPC++ compiler if available
+find_program(ICPX_EXECUTABLE icpx)
+if(ICPX_EXECUTABLE)
+    set(CMAKE_CXX_COMPILER ${ICPX_EXECUTABLE} CACHE STRING "DPC++ compiler" FORCE)
+else()
+    message(FATAL_ERROR "Intel SYCL compiler 'icpx' not found. Please install Intel oneAPI or another SYCL compiler.")
+endif()
+
+project(MarketData LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-project(MarketData)
+find_package(ZeroMQ REQUIRED CONFIG)
+find_package(cppzmq REQUIRED)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 23)
+find_package(MPI REQUIRED)
 
-# Find required packages using vcpkg
-find_package(SYCL REQUIRED)
-find_package(ZeroMQ REQUIRED)
-find_package(QuickFIX REQUIRED)
-
-# Add executable
 add_executable(MarketData src/feed/exchange.cpp)
 
-# Link the libraries
-target_link_libraries(MarketData PRIVATE
-        SYCL::SYCL
-        zmq
-        QuickFIX::QuickFIX
+target_link_libraries(MarketData
+    PRIVATE
+    libzmq-static
+    cppzmq
+    openmpi::openmpi
 )
+target_include_directories(MarketData PRIVATE ${MPI_CXX_INCLUDE_DIRS})
 
-# Optional: Set include directories (if needed)
-# target_include_directories(MarketDataReceiver PRIVATE ${CONAN_INCLUDE_DIRS})
+if(MPI_COMPILE_FLAGS)
+    target_compile_options(MarketData PRIVATE ${MPI_COMPILE_FLAGS})
+endif()
+
+if(MPI_LINK_FLAGS)
+    target_link_options(MarketData PRIVATE ${MPI_LINK_FLAGS})
+endif()
+
+target_compile_options(MarketData PRIVATE -fsycl)
+target_link_options(MarketData PRIVATE -fsycl)
+
