@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include "core/utils/tp_queue.h"
+#include "core/utils/skip_list.h"
 #include <thread>
 #include <chrono>
 #include <iostream>
@@ -15,6 +17,9 @@ TEST_CASE( "Factorials are computed", "[factorial]" ) {
     REQUIRE( Factorial(10) == 3628800 );
     
     dxcore::LockFreeQueue<int> q;
+    dxcore::SkipList<int, int> sk(-1);
+
+    std::cout << sk.search(4)->key;
 
     auto now = []() -> uint64_t {
         return std::chrono::duration_cast<std::chrono::microseconds>(

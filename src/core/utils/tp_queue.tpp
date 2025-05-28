@@ -6,7 +6,6 @@ template <typename T>
 LockFreeQueue<T>::Node::Node(T val, uint64_t ts)
     : data(std::move(val)), timestamp(ts), next(nullptr), prev(nullptr) {}
 
-
 template <typename T>
 LockFreeQueue<T>::LockFreeQueue() {
     Node* dummy = new Node(T{}, 0);
@@ -14,16 +13,15 @@ LockFreeQueue<T>::LockFreeQueue() {
     tail.store(dummy);
 }
 
-
 template <typename T>
 LockFreeQueue<T>::~LockFreeQueue() {
     while (pop());
     delete head.load();
 }
 
-
 template <typename T>
-typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(T value, uint64_t timestamp) {
+typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(T value,
+                                                          uint64_t timestamp) {
     Node* newNode = new Node(std::move(value), timestamp);
 
     while (true) {
@@ -48,9 +46,9 @@ typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(T value, uint64_t time
                                             std::memory_order_relaxed)) {
             if (nextNode != nullptr) {
                 Node* expectedPrev = pos;
-                while (!nextNode->prev.compare_exchange_weak(expectedPrev, newNode,
-                                                             std::memory_order_release,
-                                                             std::memory_order_relaxed)) {
+                while (!nextNode->prev.compare_exchange_weak(
+                    expectedPrev, newNode, std::memory_order_release,
+                    std::memory_order_relaxed)) {
                     expectedPrev = pos;
                 }
             } else {
@@ -63,7 +61,6 @@ typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(T value, uint64_t time
         }
     }
 }
-
 
 template <typename T>
 bool LockFreeQueue<T>::remove(Node* node) {
@@ -89,12 +86,13 @@ bool LockFreeQueue<T>::remove(Node* node) {
             continue;
         }
 
-        // Successfully unlinked from prevNode, now unlink from nextNode->prev if nextNode exists
+        // Successfully unlinked from prevNode, now unlink from nextNode->prev
+        // if nextNode exists
         if (nextNode != nullptr) {
             Node* expectedPrev = node;
-            while (!nextNode->prev.compare_exchange_weak(expectedPrev, prevNode,
-                                                         std::memory_order_acq_rel,
-                                                         std::memory_order_acquire)) {
+            while (!nextNode->prev.compare_exchange_weak(
+                expectedPrev, prevNode, std::memory_order_acq_rel,
+                std::memory_order_acquire)) {
                 if (expectedPrev != node) {
                     // Someone else already updated nextNode->prev, done
                     break;
@@ -115,7 +113,6 @@ bool LockFreeQueue<T>::remove(Node* node) {
         return true;
     }
 }
-
 
 template <typename T>
 std::unique_ptr<T> LockFreeQueue<T>::pop() {
@@ -138,5 +135,4 @@ std::unique_ptr<T> LockFreeQueue<T>::pop() {
     }
 }
 
-}
-
+}  // namespace dxcore
