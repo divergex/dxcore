@@ -57,6 +57,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
             -Wconversion
             -Wsign-conversion
             -Wunused-parameter
+            -fcoroutines
         )
     endforeach()
 endif()

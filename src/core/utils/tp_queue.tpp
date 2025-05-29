@@ -3,8 +3,9 @@
 namespace dxcore {
 
 template <typename T>
-LockFreeQueue<T>::Node::Node(T val, uint64_t ts)
-    : data(std::move(val)), timestamp(ts), next(nullptr), prev(nullptr) {}
+template <typename U>
+LockFreeQueue<T>::Node::Node(U&& data, uint64_t ts)
+    : data(std::forward<U>(data)), timestamp(ts), next(nullptr), prev(nullptr) {}
 
 template <typename T>
 LockFreeQueue<T>::LockFreeQueue() {
@@ -20,9 +21,10 @@ LockFreeQueue<T>::~LockFreeQueue() {
 }
 
 template <typename T>
-typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(T value,
+template <typename U>
+typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(U&& data,
                                                           uint64_t timestamp) {
-    Node* newNode = new Node(std::move(value), timestamp);
+    Node* newNode = new Node(std::forward<U>(data), timestamp);
 
     while (true) {
         Node* curTail = tail.load(std::memory_order_acquire);
@@ -63,9 +65,17 @@ typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(T value,
 }
 
 template <typename T>
+template <typename U>
+typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(U&& data) {
+    uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::system_clock::now().time_since_epoch())
+                       .count();
+    return insert(std::forward<U>(data), now);
+}
+
+template <typename T>
 bool LockFreeQueue<T>::remove(Node* node) {
     if (node == nullptr || node == head.load(std::memory_order_acquire)) {
-        // Cannot remove dummy head or nullptr
         return false;
     }
 
@@ -74,39 +84,31 @@ bool LockFreeQueue<T>::remove(Node* node) {
         Node* nextNode = node->next.load(std::memory_order_acquire);
 
         if (prevNode == nullptr) {
-            // Node is detached or already removed
             return false;
         }
 
-        // Attempt to unlink node from prevNode->next
         if (!prevNode->next.compare_exchange_weak(node, nextNode,
                                                   std::memory_order_acq_rel,
                                                   std::memory_order_acquire)) {
-            // Failed, maybe prevNode->next changed, retry
             continue;
         }
 
-        // Successfully unlinked from prevNode, now unlink from nextNode->prev
-        // if nextNode exists
         if (nextNode != nullptr) {
             Node* expectedPrev = node;
             while (!nextNode->prev.compare_exchange_weak(
                 expectedPrev, prevNode, std::memory_order_acq_rel,
                 std::memory_order_acquire)) {
                 if (expectedPrev != node) {
-                    // Someone else already updated nextNode->prev, done
                     break;
                 }
             }
         } else {
-            // We removed the tail node, try to update tail pointer
             Node* expectedTail = node;
             tail.compare_exchange_weak(expectedTail, prevNode,
                                        std::memory_order_acq_rel,
                                        std::memory_order_acquire);
         }
 
-        // Finally mark node as removed by setting its prev to nullptr
         node->prev.store(nullptr, std::memory_order_release);
         node->next.store(nullptr, std::memory_order_release);
 
@@ -133,6 +135,29 @@ std::unique_ptr<T> LockFreeQueue<T>::pop() {
             return std::unique_ptr<T>(value);
         }
     }
+}
+
+template <typename T>
+LockFreeQueue<T>::LockFreeQueue(LockFreeQueue&& other) noexcept
+    : head(other.head.load(std::memory_order_acquire)),
+      tail(other.tail.load(std::memory_order_acquire)) {
+    other.head.store(nullptr, std::memory_order_release);
+    other.tail.store(nullptr, std::memory_order_release);
+}
+
+template <typename T>
+LockFreeQueue<T>& LockFreeQueue<T>::operator=(LockFreeQueue&& other) noexcept {
+    if (this != &other) {
+        while (pop());
+        delete head.load();
+
+        head.store(other.head.load(std::memory_order_acquire));
+        tail.store(other.tail.load(std::memory_order_acquire));
+
+        other.head.store(nullptr, std::memory_order_release);
+        other.tail.store(nullptr, std::memory_order_release);
+    }
+    return *this;
 }
 
 }  // namespace dxcore

@@ -2,6 +2,7 @@
 add_library(core
     utils/skip_list.h
     utils/tp_queue.h
+    utils/generator.h
     core.cpp
 )
 

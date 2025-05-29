@@ -1,25 +1,35 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
-#include "core/utils/tp_queue.h"
-#include "core/utils/skip_list.h"
-#include <thread>
 #include <chrono>
 #include <iostream>
+#include <thread>
 
-unsigned int Factorial( unsigned int number ) {
-    return number <= 1 ? number : Factorial(number-1)*number;
+#include "core/utils/skip_list.h"
+#include "core/utils/tp_queue.h"
+
+unsigned int Factorial(unsigned int number) {
+    return number <= 1 ? number : Factorial(number - 1) * number;
 };
 
-TEST_CASE( "Factorials are computed", "[factorial]" ) {
-    REQUIRE( Factorial(1) == 1 );
-    REQUIRE( Factorial(2) == 2 );
-    REQUIRE( Factorial(3) == 6 );
-    REQUIRE( Factorial(10) == 3628800 );
-    
-    dxcore::LockFreeQueue<int> q;
-    dxcore::SkipList<int, int> sk(-1);
+TEST_CASE("Factorials are computed", "[factorial]") {
+    REQUIRE(Factorial(1) == 1);
+    REQUIRE(Factorial(2) == 2);
+    REQUIRE(Factorial(3) == 6);
+    REQUIRE(Factorial(10) == 3628800);
 
-    std::cout << sk.search(4)->key;
+    dxcore::LockFreeQueue<int> q;
+    dxcore::SkipList<int, dxcore::LockFreeQueue<int>> sk(-1);
+    
+    q.insert(1);
+    sk.insert(1, std::move(q));
+
+    // auto gen = sk.inorder();
+    // while (!gen.done()) {
+    //     auto node = gen.next();
+    //     if (node) {
+    //         std::cout << node->key << ": " << node->data->pop() << '\n';
+    //     }
+    // }
 
     auto now = []() -> uint64_t {
         return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -30,7 +40,7 @@ TEST_CASE( "Factorials are computed", "[factorial]" ) {
 
     std::thread t1([&]() {
         for (int i = 0; i < 10; i += 2) {
-            uint64_t ts = now() + i * 10;
+            int64_t ts = now() + i * 10;
             q.insert(i, ts);
         }
     });
