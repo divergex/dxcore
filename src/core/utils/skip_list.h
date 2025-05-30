@@ -49,7 +49,7 @@ class SkipList {
 
     Node* root;
 
-    Node* search(K key);
+    std::shared_ptr<T> search(K key);
 
     dxcore::Generator<SkipList<K, T>::Node*> inorder();
 

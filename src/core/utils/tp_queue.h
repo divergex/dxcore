@@ -11,13 +11,33 @@ template <typename T>
 class LockFreeQueue {
    public:
     struct Node {
-        T data;
+        std::shared_ptr<T> data;
         uint64_t timestamp;
         std::atomic<Node*> next;
         std::atomic<Node*> prev;
 
+        Node() : timestamp(0), data(nullptr), next(nullptr), prev(nullptr) {}
+
+        explicit Node(uint64_t ts)
+            : timestamp(ts), data(nullptr), next(nullptr), prev(nullptr) {}
+
         template <typename U>
-        Node(U&& data, uint64_t ts = {});
+        Node(U&& d,
+             std::enable_if_t<
+                 std::is_same_v<std::decay_t<U>, std::shared_ptr<T>>, int> = 0)
+            : timestamp(0),
+              data(std::forward<U>(d)),
+              next(nullptr),
+              prev(nullptr) {}
+
+        template <typename U>
+        Node(uint64_t ts, U&& d,
+             std::enable_if_t<
+                 std::is_same_v<std::decay_t<U>, std::shared_ptr<T>>, int> = 0)
+            : timestamp(ts),
+              data(std::forward<U>(d)),
+              next(nullptr),
+              prev(nullptr) {}
     };
 
     std::atomic<Node*> head;
@@ -34,11 +54,12 @@ class LockFreeQueue {
     LockFreeQueue& operator=(LockFreeQueue&& other) noexcept;
 
     template <typename U>
-    LockFreeQueue<T>::Node* insert(U&& data, uint64_t timestamp);
+    Node* insert(U&& data, uint64_t timestamp);
     template <typename U>
-    LockFreeQueue<T>::Node* insert(U&& data);
+    Node* insert(U&& data);
+
     bool remove(LockFreeQueue<T>::Node* node);
-    std::unique_ptr<T> pop();
+    std::shared_ptr<T> pop();
 };
 
 }  // namespace dxcore

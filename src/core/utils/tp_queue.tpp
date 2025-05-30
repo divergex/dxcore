@@ -1,15 +1,16 @@
+#pragma once
+
 #include <utility>
+#include <chrono>
+
+#include "tp_queue.h"
 
 namespace dxcore {
 
-template <typename T>
-template <typename U>
-LockFreeQueue<T>::Node::Node(U&& data, uint64_t ts)
-    : data(std::forward<U>(data)), timestamp(ts), next(nullptr), prev(nullptr) {}
 
 template <typename T>
 LockFreeQueue<T>::LockFreeQueue() {
-    Node* dummy = new Node(T{}, 0);
+    Node* dummy = new Node();
     head.store(dummy);
     tail.store(dummy);
 }
@@ -24,7 +25,7 @@ template <typename T>
 template <typename U>
 typename LockFreeQueue<T>::Node* LockFreeQueue<T>::insert(U&& data,
                                                           uint64_t timestamp) {
-    Node* newNode = new Node(std::forward<U>(data), timestamp);
+    Node* newNode = new Node(timestamp, std::forward<U>(data));
 
     while (true) {
         Node* curTail = tail.load(std::memory_order_acquire);
@@ -117,9 +118,13 @@ bool LockFreeQueue<T>::remove(Node* node) {
 }
 
 template <typename T>
-std::unique_ptr<T> LockFreeQueue<T>::pop() {
+std::shared_ptr<T> LockFreeQueue<T>::pop() {
     while (true) {
         Node* currHead = head.load(std::memory_order_acquire);
+        
+        if (!currHead)
+            return nullptr;
+
         Node* firstNode = currHead->next.load(std::memory_order_acquire);
 
         if (firstNode == nullptr) {
@@ -130,9 +135,8 @@ std::unique_ptr<T> LockFreeQueue<T>::pop() {
                                        std::memory_order_release,
                                        std::memory_order_relaxed)) {
             firstNode->prev.store(nullptr, std::memory_order_relaxed);
-            T* value = new T(std::move(firstNode->data));
             delete currHead;
-            return std::unique_ptr<T>(value);
+            return firstNode->data;
         }
     }
 }

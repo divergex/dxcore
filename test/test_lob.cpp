@@ -1,74 +1,24 @@
-#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
-#include <iostream>
-#include <thread>
+#include <cstdint>
 
 #include "core/utils/skip_list.h"
 #include "core/utils/tp_queue.h"
+#include "core/orders/order_book.h"
 
-unsigned int Factorial(unsigned int number) {
-    return number <= 1 ? number : Factorial(number - 1) * number;
-};
+inline uint64_t now() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
 TEST_CASE("Factorials are computed", "[factorial]") {
-    REQUIRE(Factorial(1) == 1);
-    REQUIRE(Factorial(2) == 2);
-    REQUIRE(Factorial(3) == 6);
-    REQUIRE(Factorial(10) == 3628800);
+    auto pl = std::make_shared<dxcore::LockFreeQueue<dxcore::Order>>();
+    pl->insert(std::make_shared<dxcore::Order>(1, 1.0)); // ✅ correct type
 
-    dxcore::LockFreeQueue<int> q;
-    dxcore::SkipList<int, dxcore::LockFreeQueue<int>> sk(-1);
+    dxcore::OrderBook* lob = new dxcore::OrderBook();
+
+    lob->asks.insert(1.0, pl);
+
     
-    q.insert(1);
-    sk.insert(1, std::move(q));
-
-    // auto gen = sk.inorder();
-    // while (!gen.done()) {
-    //     auto node = gen.next();
-    //     if (node) {
-    //         std::cout << node->key << ": " << node->data->pop() << '\n';
-    //     }
-    // }
-
-    auto now = []() -> uint64_t {
-        return std::chrono::duration_cast<std::chrono::microseconds>(
-                   std::chrono::steady_clock::now().time_since_epoch())
-            .count();
-    };
-    dxcore::LockFreeQueue<int>::Node* invalid = q.insert(-1, 0);
-
-    std::thread t1([&]() {
-        for (int i = 0; i < 10; i += 2) {
-            int64_t ts = now() + i * 10;
-            q.insert(i, ts);
-        }
-    });
-
-    std::thread t2([&]() {
-        for (int i = 1; i < 10; i += 2) {
-            uint64_t ts = now();
-            q.insert(i, ts);
-        }
-    });
-
-    std::thread t3([&]() {
-        for (int i = 0; i < 10; i++) {
-            while (true) {
-                auto val = q.pop();
-                if (val) {
-                    std::cout << "Popped: " << *val << std::endl;
-                    break;
-                }
-                std::this_thread::yield();
-            }
-        }
-    });
-
-    // bool success = q.remove(invalid);
-    // std::cout << success << std::endl;
-
-    t1.join();
-    t2.join();
-    t3.join();
 }

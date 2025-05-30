@@ -1,3 +1,5 @@
+#pragma once
+
 #include <atomic>
 #include <cstdlib>
 #include <iostream>
@@ -5,6 +7,7 @@
 #include <vector>
 
 #include "generator.h"
+#include "skip_list.h"
 
 namespace dxcore {
 
@@ -20,7 +23,7 @@ SkipList<K, T>::~SkipList() {
 }
 
 template <typename K, typename T>
-typename SkipList<K, T>::Node* SkipList<K, T>::search(K key) {
+typename std::shared_ptr<T> SkipList<K, T>::search(K key) {
     Node* node = this->root;
     Node* next;
     while (node != nullptr) {
@@ -35,12 +38,12 @@ typename SkipList<K, T>::Node* SkipList<K, T>::search(K key) {
                 node = down;
                 down = node->down.load();
             }
-            return node;
+            return node->data;
         } else {
             node = node->down.load();
         }
     }
-    return node;
+    return node->data;
 }
 
 template <typename K, typename T>
