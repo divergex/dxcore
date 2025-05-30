@@ -15,12 +15,14 @@ class Order {
 };
 
 class OrderBook {
-    public:
-        SkipList<float, LockFreeQueue<Order>> asks;
-        SkipList<float, LockFreeQueue<Order>> bids;
+public:
+    SkipList<float, LockFreeQueue<Order>> asks;
+    SkipList<float, LockFreeQueue<Order>> bids;
 
-    OrderBook() : asks(-1), bids(-1) {};
-};
+    OrderBook() : asks(-1), bids(-1) {}
+
+    };
+
 
 }  // namespace dxcore
 

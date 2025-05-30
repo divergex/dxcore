@@ -8,7 +8,7 @@ else()
     message(FATAL_ERROR "Intel SYCL compiler 'icpx' not found. Please install Intel oneAPI or another SYCL compiler.")
 endif()
 
-project(MarketData LANGUAGES CXX)
+project(dxcore LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,11 +17,14 @@ find_package(ZeroMQ REQUIRED CONFIG)
 find_package(cppzmq REQUIRED)
 find_package(MPI REQUIRED)
 find_package(Catch2 3 REQUIRED)
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 REQUIRED)
+
+pybind11_add_module(dxcore src/bindings.cpp)
 
 add_subdirectory(src/core)
 
-add_executable(MarketData src/feed/exchange.cpp)
-target_link_libraries(MarketData
+target_link_libraries(dxcore
     PRIVATE
     libzmq-static
     cppzmq
@@ -37,19 +40,19 @@ target_link_libraries(tests
 )
 
 
-target_include_directories(MarketData PRIVATE ${MPI_CXX_INCLUDE_DIRS})
+target_include_directories(dxcore PRIVATE ${MPI_CXX_INCLUDE_DIRS})
 if(MPI_COMPILE_FLAGS)
-    target_compile_options(MarketData PRIVATE ${MPI_COMPILE_FLAGS})
+    target_compile_options(dxcore PRIVATE ${MPI_COMPILE_FLAGS})
 endif()
 if(MPI_LINK_FLAGS)
-    target_link_options(MarketData PRIVATE ${MPI_LINK_FLAGS})
+    target_link_options(dxcore PRIVATE ${MPI_LINK_FLAGS})
 endif()
 
-target_compile_options(MarketData PRIVATE -fsycl)
-target_link_options(MarketData PRIVATE -fsycl)
+target_compile_options(dxcore PRIVATE -fsycl)
+target_link_options(dxcore PRIVATE -fsycl)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
-    foreach(target core MarketData)
+    foreach(target core dxcore)
         target_compile_options(${target} PRIVATE
             -Wall
             -Wextra
