@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core", "cmake", "pybind11"]
+requires = ["scikit-build-core", "pybind11", "conan"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -9,7 +9,17 @@ description = "Core library for the Divergex ecosystem."
 authors = [{name="Rafael Zimmer"}]
 requires-python = ">=3.10"
 
+[tool.scikit-build.cmake]
+args = [
+    "-G", "Ninja",
+    "-DCMAKE_BUILD_TYPE=Debug"
+]
+minimum-version = "3.25"
+
+[tool.scikit-build.cmake.define]
+BUILD_PYTHON_BINDINGS = "ON"
+Python_EXECUTABLE = "python"
+Python3_EXECUTABLE = "python"
+
 [tool.scikit-build]
-cmake.define = { "CMAKE_PROJECT_TOP_LEVEL_INCLUDES" = "conan_provider.cmake" }
-cmake.build-type = "Release"
-sdist.exclude = ["cmake-build-debug/*"]
+wheel.packages = ["bindings/python"]

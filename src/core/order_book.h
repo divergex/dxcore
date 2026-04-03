@@ -1,13 +1,14 @@
 #ifndef ORDER_BOOK_H
 #define ORDER_BOOK_H
 
+#include <boost/uuid/uuid_hash.hpp>
+
 #include "order.h"
 #include "price_level.h"
 #include "transaction.h"
 #include "instrument.h"
 #include <map>
 #include <vector>
-#include <boost/uuid/uuid_hash.hpp>
 
 /**
  * @brief Central limit order book for a single instrument.

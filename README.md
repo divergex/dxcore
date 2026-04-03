@@ -13,23 +13,24 @@ Configuring build
 ```bash
 git clone git@github.com:divergex/dxcore
 cd dxcore
-mkdir build && cd build
 ```
 
-Installing conan dependencies:
+Configuring CMake
 ```bash
-conan install . --output-folder=build --build=missing
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=ninja -G Ninja -S ./ -B cmake-build-debug 
 ```
 
-Configuring toolchain
+Building dxcore
 ```bash
-cd build/
-cmake .. -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build cmake-build-debug --target dxcore -j $(nproc)
 ```
 
-Building and executing
+Building python bindings
 ```bash
-cmake --build . -- -j$(nproc)
-./MarketData
+cmake --build cmake-build-debug --target market -j $(nproc)
 ```
 
+Installing python package
+```bash
+pip install -e .
+```

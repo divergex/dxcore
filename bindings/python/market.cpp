@@ -8,7 +8,7 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(order_book, m) {
+PYBIND11_MODULE(market, m) {
     m.doc() = "Order book matching engine";
 
     py::class_<Transaction>(m, "Transaction", "Represents a matched trade")

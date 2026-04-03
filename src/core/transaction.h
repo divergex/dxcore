@@ -4,8 +4,8 @@
 #include "order.h"
 
 struct Transaction {
-    Order::Id buyOrderId;
-    Order::Id sellOrderId;
+    Order::Id buyOrderId{};
+    Order::Id sellOrderId{};
     double    price{};
     uint64_t  quantity{};
 };

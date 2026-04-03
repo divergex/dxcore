@@ -1,6 +1,7 @@
-# This file is managed by Conan, contents will be overwritten.
-# To keep your changes, remove these comment lines, but the plugin won't be able to modify your requirements
-
 requirements:
-  - "pybind11/3.0.1"
-  - "boost/1.90.0"
+  - boost/1.84.0
+  - pybind11/3.0.1
+
+test_requires:
+  - gtest/1.17.0
+ 

@@ -1,66 +1,53 @@
 cmake_minimum_required(VERSION 3.25)
-project(dxcore CXX)
 
-# ── dependencies ──────────────────────────────────────────────────────────────
-include(FetchContent)
+message(STATUS "Conan: Installing dependencies...")
 
-set(INSTALL_GTEST OFF CACHE BOOL "Disable installing googletest" FORCE)
-FetchContent_Declare(
-        googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG v1.17.0
+if(NOT CMAKE_BUILD_TYPE)
+    set(CONAN_BUILD_TYPE "Debug")
+else()
+    set(CONAN_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+endif()
+
+execute_process(
+        COMMAND conan install .
+        --build=missing
+        -of "${CMAKE_BINARY_DIR}"
+        -s build_type=${CONAN_BUILD_TYPE}
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE CONAN_RESULT
 )
-FetchContent_MakeAvailable(googletest)
+if(NOT CONAN_RESULT EQUAL 0)
+     message(FATAL_ERROR "Conan install failed with code ${CONAN_RESULT}")
+endif()
 
-# ── Conan automatically handled by conan_provider.cmake ───────────────────────
-# include(${CMAKE_BINARY_DIR}/conan_provider.cmake OPTIONAL)
+message(STATUS "Conan: Dependencies installed to ${CMAKE_BINARY_DIR}")
 
-# ── core library ──────────────────────────────────────────────────────────────
-add_library(dxcore STATIC
-        src/dxcore.h
-        src/core/order.cpp
-        src/core/price_level.cpp
-        src/core/order_book.cpp
-)
+if(EXISTS "${CMAKE_BINARY_DIR}/build/${CONAN_BUILD_TYPE}/generators/conan_toolchain.cmake")
+    set(CONAN_GENERATORS_DIR "${CMAKE_BINARY_DIR}/build/${CONAN_BUILD_TYPE}/generators")
+elseif(EXISTS "${CMAKE_BINARY_DIR}/build/generators/conan_toolchain.cmake")
+    set(CONAN_GENERATORS_DIR "${CMAKE_BINARY_DIR}/build/generators")
+elseif(EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
+    set(CONAN_GENERATORS_DIR "${CMAKE_BINARY_DIR}")
+else()
+    message(FATAL_ERROR "Could not find conan_toolchain.cmake in any expected location")
+endif()
 
-target_include_directories(dxcore PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
+message(STATUS "Conan generators directory: ${CONAN_GENERATORS_DIR}")
 
-# Link Conan’s Boost if available, fallback to system Boost otherwise
-find_package(Boost REQUIRED)
-target_link_libraries(dxcore PUBLIC Boost::headers)
+include("${CONAN_GENERATORS_DIR}/conan_toolchain.cmake")
 
-target_compile_features(dxcore PUBLIC cxx_std_17)
-set_target_properties(dxcore PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# --------------------------------------------------------------------- #
 
-# ── tests ─────────────────────────────────────────────────────────────────────
+project(dxcore LANGUAGES CXX)
 
-enable_testing()
+list(APPEND CMAKE_PREFIX_PATH "${CONAN_GENERATORS_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${CONAN_GENERATORS_DIR}")
 
-add_executable(dxcore-tests
-        test/test_order.cpp
-        test/test_price_level.cpp
-        test/test_order_book.cpp
-)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_GMOCK ON CACHE BOOL "" FORCE)
+set(BUILD_GTEST ON CACHE BOOL "" FORCE)
 
-target_include_directories(dxcore-tests PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
-target_link_libraries(dxcore-tests PRIVATE
-        dxcore
-        GTest::gtest_main
-)
-
-include(GoogleTest)
-gtest_discover_tests(dxcore-tests)
-
-# ── bindings ──────────────────────────────────────────────────────────────────
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-find_package(pybind11 REQUIRED)
-
-pybind11_add_module(order_book bindings/python/order_book.cpp)
-target_include_directories(order_book PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(order_book PRIVATE dxcore)
-set_target_properties(order_book PROPERTIES CXX_STANDARD 17)
-
-install(TARGETS order_book DESTINATION dxcore)
+add_subdirectory(src)
+add_subdirectory(bindings/python)
+add_subdirectory(tests)

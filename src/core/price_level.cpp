@@ -5,9 +5,7 @@
 
 
 PriceLevel::PriceLevel(double price)
-    : price(price)
-    , totalQuantity(0)
-{}
+    : price(price), totalQuantity(0), index() {}
 
 void PriceLevel::addOrder(Order order) {
     totalQuantity += order.getRemaining();

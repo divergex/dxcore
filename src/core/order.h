@@ -1,5 +1,3 @@
-
-// order.h
 #ifndef ORDER_H
 #define ORDER_H
 
@@ -19,8 +17,8 @@ public:
     bool operator==(const Order& other) const { return id == other.id; }
     bool operator<(const Order& other) const  { return id < other.id; }
 
-    Id          getId()         const { return id; }
-    uint64_t    getRemaining()  const { return quantity - filled; }
+    [[nodiscard]] Id          getId()         const { return id; }
+    [[nodiscard]] uint64_t    getRemaining()  const { return quantity - filled; }
 
     void fill(uint64_t amount);
     void cancel();

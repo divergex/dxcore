@@ -1,19 +1,20 @@
 // order.cpp
+#include <boost/uuid/uuid_generators.hpp>
+
 #include "order.h"
 
-#include <boost/uuid/uuid_generators.hpp>
 #include <stdexcept>
 
 static boost::uuids::random_generator gen;
 
 Order::Order(OrderType type, Side side, double price, uint64_t quantity)
-    : id(gen())
-    , type(type)
+    : type(type)
     , side(side)
-    , status(OrderStatus::New)
     , price(price)
     , quantity(quantity)
     , filled(0)
+    , status(OrderStatus::New)
+    , id(gen())
 {}
 
 void Order::fill(uint64_t amount) {
