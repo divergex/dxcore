@@ -5,7 +5,7 @@ This project demonstrates the use of SYCL, ZeroMQ, and QuickFIX to receive and p
 
 ## Installing
 
-`
+`bash
 pip install dxcore
 `
 
