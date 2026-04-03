@@ -27,7 +27,7 @@ jobs:
     #            build_type: Release
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dependencies (Ubuntu)
         run: |
@@ -47,8 +47,8 @@ jobs:
         shell: bash
         run: |
           source venv/bin/activate
-          conan profile detect
-          conan install . --build=missing
+          conan profile detect --force
+          conan install . --profile default --build=missing
 
       - name: Set build output directory
         id: strings
@@ -85,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 
