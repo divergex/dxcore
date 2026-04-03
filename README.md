@@ -40,3 +40,8 @@ Installing python package
 ```bash
 pip install -e .
 ```
+
+Local build test
+```bash
+act push -b --artifact-server-path=/tmp/artifacts
+```

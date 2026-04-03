@@ -11,61 +11,50 @@ on:
 jobs:
   build:
     if: github.event_name != 'release'
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            c_compiler: gcc
+          - c_compiler: gcc
             cpp_compiler: g++
             build_type: Release
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install dependencies (Ubuntu)
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            cmake ninja-build python3-venv python3-pip python3-dev
+          sudo apt-get install -y cmake ninja-build python3-venv python3-pip python3-dev
+
+      - name: Setup Python virtual environment
+        run: |
+          python3 -m venv $HOME/venv_dxcore
+          source $HOME/venv_dxcore/bin/activate
+          pip install --upgrade pip
+          pip install conan
 
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.conan2/
-#            ~/.conan2/profiles
+          path: ~/.conan2/
           key: conan-cache-${{ runner.os }}-${{ hashFiles('**/conandata.yml', '**/conanfile.py') }}
           restore-keys: |
             conan-cache-${{ runner.os }}-
 
-      - name: Setup Python virtual environment
-        run: |
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install conan
-
-      - name: Setup Conan
+      - name: Setup Conan and install dependencies
         shell: bash
         run: |
-          source venv/bin/activate
+          source $HOME/venv_dxcore/bin/activate
           conan profile detect --force
           conan install . --profile default --build=missing
-
-      - name: Set build output directory
-        id: strings
-        shell: bash
-        run: |
-          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
       - name: Configure CMake
         shell: bash
         run: |
-          source venv/bin/activate
-          cmake -B ${{ steps.strings.outputs.build-output-dir }} \
+          source $HOME/venv_dxcore/bin/activate
+          cmake -B build \
                 -G Ninja \
                 -DCMAKE_MAKE_PROGRAM=$(which ninja) \
                 -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} \
@@ -76,60 +65,19 @@ jobs:
       - name: Build source and bindings
         shell: bash
         run: |
-          source venv/bin/activate
-          cmake --build ${{ steps.strings.outputs.build-output-dir }} --target dxcore --config ${{ matrix.build_type }}
-          cmake --build ${{ steps.strings.outputs.build-output-dir }} --target python --config ${{ matrix.build_type }}
+          source $HOME/venv_dxcore/bin/activate
+          cmake --build build --target dxcore --config ${{ matrix.build_type }}
+          cmake --build build --target python --config ${{ matrix.build_type }}
+          pip install --upgrade build scikit-build-core pybind11 cmake
+          python -m build --no-isolation
 
-  interface-build:
-    if: github.event_name != 'release'
-    runs-on: ubuntu-latest
-    needs: build
-
-    permissions:
-      id-token: write
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-python@v6
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          python-version: "3.x"
+          name: build-artifacts
+          path: build/
 
-      - name: Cache Conan packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.conan2/
-          #            ~/.conan2/profiles
-          key: conan-cache-${{ runner.os }}-${{ hashFiles('**/conandata.yml', '**/conanfile.py') }}
-          restore-keys: |
-            conan-cache-${{ runner.os }}-
-
-      - name: Install Ninja
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
-
-      - name: Setup Python virtual environment and install dependencies
-        shell: bash
-        run: |
-          python3 -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install conan build
-
-      - name: Setup Conan profile
-        shell: bash
-        run: |
-          source venv/bin/activate
-          conan profile detect --force
-
-      - name: Build distributions
-        shell: bash
-        run: |
-          source venv/bin/activate
-          python -m build
-
-      - name: Upload distributions
-        if: ${{ !env.ACT }}
+      - name: Upload Python interface
         uses: actions/upload-artifact@v4
         with:
           name: release-dists
@@ -139,7 +87,7 @@ jobs:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     needs:
-      - interface-build
+      - build
     permissions:
       id-token: write
 
