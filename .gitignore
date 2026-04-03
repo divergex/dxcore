@@ -3,3 +3,4 @@ target/
 cmake-build-debug/
 Cargo.lock
 .idea/
+dist/

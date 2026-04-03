@@ -136,6 +136,7 @@ jobs:
           path: dist/
 
   publish:
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     needs:
       - interface-build

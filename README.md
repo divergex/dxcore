@@ -3,6 +3,12 @@
 
 This project demonstrates the use of SYCL, ZeroMQ, and QuickFIX to receive and process market data. The system connects to a ZeroMQ channel for market data transmission and uses QuickFIX for message parsing. The program also uses DPC++ for running FPGA/CPU/GPU tasks.
 
+## Installing
+
+`
+pip install dxcore
+`
+
 ## Prerequisites
 
 Ensure the following are installed and set up:
