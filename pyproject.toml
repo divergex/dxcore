@@ -6,6 +6,8 @@ build-backend = "scikit_build_core.build"
 name = "dxcore"
 version = "0.1.0"
 description = "Core library for the Divergex ecosystem."
+readme = "README.md"
+readme-content-type = "text/markdown"
 authors = [{name="Rafael Zimmer"}]
 requires-python = ">=3.10"
 
