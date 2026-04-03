@@ -27,7 +27,7 @@ cmake --build cmake-build-debug --target dxcore -j $(nproc)
 
 Building python bindings
 ```bash
-cmake --build cmake-build-debug --target market -j $(nproc)
+cmake --build cmake-build-debug --target python -j $(nproc)
 ```
 
 Installing python package
