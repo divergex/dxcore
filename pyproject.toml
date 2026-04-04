@@ -1,12 +1,16 @@
 [build-system]
-requires = ["scikit-build-core", "pybind11", "conan"]
+requires = [
+    "scikit-build-core>=0.10",
+    "pybind11",
+    "conan",
+]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "dxcore"
 version = "0.1.0"
 description = "Core library for the Divergex ecosystem."
-authors = [{name="Rafael Zimmer"}]
+authors = [{ name = "Rafael Zimmer" }]
 requires-python = ">=3.10"
 
 [project.readme]
@@ -16,7 +20,7 @@ file = "README.md"
 [tool.scikit-build.cmake]
 args = [
     "-G", "Ninja",
-    "-DCMAKE_BUILD_TYPE=Debug"
+    "-DCMAKE_BUILD_TYPE=Release"
 ]
 version = ">=3.25"
 
@@ -25,5 +29,8 @@ BUILD_PYTHON_BINDINGS = "ON"
 Python_EXECUTABLE = "python"
 Python3_EXECUTABLE = "python"
 
-[tool.scikit-build]
-wheel.packages = ["dxcore"]
+
+#[tool.cibuildwheel]
+#build = ["cp310-manylinux_x86_64", "cp311-manylinux_x86_64", "cp312-manylinux_x86_64"]
+#before-all = "yum install -y ninja-build conan && conan profile detect --force"
+#test-command = "python -c 'import dxcore'"

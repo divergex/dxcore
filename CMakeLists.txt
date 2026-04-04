@@ -8,9 +8,16 @@ else()
     set(CONAN_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 endif()
 
+if(DEFINED ENV{CONAN_PROFILE})
+    set(CONAN_PROFILE_ARG "--profile=${CMAKE_SOURCE_DIR}/$ENV{CONAN_PROFILE}")
+else()
+    set(CONAN_PROFILE_ARG "")
+endif()
+
 execute_process(
         COMMAND conan install .
         --build=missing
+        ${CONAN_PROFILE_ARG}
         -of "${CMAKE_BINARY_DIR}"
         -s build_type=${CONAN_BUILD_TYPE}
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"

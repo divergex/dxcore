@@ -43,5 +43,7 @@ pip install -e .
 
 Local build test
 ```bash
-act push -b --artifact-server-path=/tmp/artifacts
+act push -b \
+  --artifact-server-path=/tmp/artifacts \
+  --container-options "--privileged";
 ```
