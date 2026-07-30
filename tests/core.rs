@@ -1,8 +1,5 @@
-use super::*;
+use cadlag::core::*;
 
-// ---------------------------------------------------------------------------
-// Instrument
-// ---------------------------------------------------------------------------
 
 fn make_instrument(id: i32, symbol: &str) -> Instrument {
     Instrument {
@@ -56,10 +53,6 @@ fn instrument_hash_consistent_with_eq() {
     set.insert(c);
     assert_eq!(set.len(), 2);
 }
-
-// ---------------------------------------------------------------------------
-// Portfolio
-// ---------------------------------------------------------------------------
 
 #[test]
 fn portfolio_upsert_metric_adds_and_updates() {
@@ -121,10 +114,6 @@ fn portfolio_negative_quantity_preserved() {
     assert_eq!(p.holding_count(), 1);
     assert_eq!(p.quantity(1), Some(-100.0));
 }
-
-// ---------------------------------------------------------------------------
-// InstrumentStore
-// ---------------------------------------------------------------------------
 
 #[test]
 fn store_insert_and_lookup_by_id() {

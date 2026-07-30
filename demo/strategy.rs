@@ -2,19 +2,16 @@
 //!
 //! Run with: `cargo run --example strategy`
 //!
-//! Key design point: the View is the translation layer between source data
-//! columns and the strategy's expected column names. Here the source DataFrame
-//! uses `"close"`, the strategy expects `"price"`, and the View handles the
-//! rename at the boundary.
+//! Key design points:
+//! - The View translates source columns ("close") → strategy columns ("price")
+//!   via its `col_map`. The strategy never sees the source schema.
+//! - The strategy defines its output frame (a DataFrame of signals) and
+//!   the executor collects it automatically.
 
 use polars::prelude::*;
-use dxcore_rs::trading::{DailyView, Strategy, View};
+use cadlag::trading::{DailyView, Strategy, SyncExecutor};
 
-// ---------------------------------------------------------------------------
-// Signal
-// ---------------------------------------------------------------------------
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Signal {
     date: i32,
     action: String,
@@ -23,14 +20,9 @@ struct Signal {
     cash: f64,
     equity: f64,
 }
+/// Strategy reads from column `"price"` — the View's `col_map` ensures that
+/// the source `"close"` column arrives renamed.
 
-// ---------------------------------------------------------------------------
-// Strategy: 5/10 SMA crossover
-// ---------------------------------------------------------------------------
-
-/// The strategy declares its column contract: it reads from a column named
-/// `"price"`. It has no knowledge of what the source DataFrame calls that
-/// column — the View is responsible for renaming.
 #[derive(Debug, Default)]
 struct State {
     cash: f64,
@@ -49,6 +41,7 @@ impl Strategy for SmaCross {
     type Input = (i32, DataFrame);
     type State = State;
     type Output = Signal;
+    type Frame = DataFrame;
 
     fn on_step(
         &self,
@@ -56,7 +49,6 @@ impl Strategy for SmaCross {
         history: &DataFrame,
         state: &mut State,
     ) -> Signal {
-        // Strategy always reads from column "price" — the canonical name.
         let price = day_df
             .column("price")
             .unwrap()
@@ -100,7 +92,8 @@ impl Strategy for SmaCross {
                 }
             }
             _ => {
-                if state.cash == self.initial_cash && state.shares == 0.0 && price.is_finite() {
+                if state.shares == 0.0 && state.cash == 0.0 && price.is_finite() {
+                    state.cash = self.initial_cash;
                     let shares_to_buy = (state.cash / price).trunc();
                     state.shares += shares_to_buy;
                     state.cash -= shares_to_buy * price;
@@ -118,6 +111,36 @@ impl Strategy for SmaCross {
 
         Signal { date, action, price, shares: state.shares, cash: state.cash, equity }
     }
+
+    fn create_output(&self) -> DataFrame {
+        // Columns that match Signal's fields.
+        DataFrame::new(vec![
+            Column::new_empty("date".into(), &DataType::Int32),
+            Column::new_empty("action".into(), &DataType::String),
+            Column::new_empty("price".into(), &DataType::Float64),
+            Column::new_empty("shares".into(), &DataType::Float64),
+            Column::new_empty("cash".into(), &DataType::Float64),
+            Column::new_empty("equity".into(), &DataType::Float64),
+        ]).unwrap()
+    }
+
+    fn append_output(&self, frame: &mut DataFrame, output: Signal, _step: &(i32, DataFrame)) {
+        let row = DataFrame::new(vec![
+            Column::new("date".into(), &[output.date]),
+            Column::new("action".into(), &[output.action.as_str()]),
+            Column::new("price".into(), &[output.price]),
+            Column::new("shares".into(), &[output.shares]),
+            Column::new("cash".into(), &[output.cash]),
+            Column::new("equity".into(), &[output.equity]),
+        ])
+        .unwrap();
+
+        if frame.width() == 0 {
+            *frame = row;
+        } else {
+            frame.vstack_mut(&row).unwrap();
+        }
+    }
 }
 
 /// SMA of column `col` in history. None if column missing or insufficient data.
@@ -131,23 +154,6 @@ fn column_sma(history: &DataFrame, col: &str, window: usize) -> Option<f64> {
     Some(sum / window as f64)
 }
 
-// ---------------------------------------------------------------------------
-// Rename helper — the View's translation boundary
-// ---------------------------------------------------------------------------
-
-/// Rename a column in a DataFrame. Returns a new DataFrame.
-fn rename_column(df: &DataFrame, from: &str, to: &str) -> DataFrame {
-    let mut out = df.clone();
-    out.rename(from, to.into()).unwrap();
-    out
-}
-
-// ---------------------------------------------------------------------------
-// Synthetic data
-// ---------------------------------------------------------------------------
-
-/// Deterministic price path. Source columns use `"close"` — the application's
-/// native naming. The View translates `"close"` → `"price"` at the boundary.
 fn generate_ohlc(n_days: usize) -> DataFrame {
     let prices: Vec<f64> = (0..n_days)
         .map(|i| {
@@ -199,62 +205,23 @@ fn generate_ohlc(n_days: usize) -> DataFrame {
     .unwrap()
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 fn main() {
     let df = generate_ohlc(30);
     println!("=== OHLC Data (source columns: 'close') ===\n{:?}\n", df.head(Some(5)));
 
-    // -- Manual loop: View translates source "close" → strategy "price" --
-    let signals = run_with_signals(&df);
+    // The View translates "close" → "price" via col_map.
+    // The strategy only knows about "price".
+    let view = DailyView::new("date")
+        .with_col_map(vec![("close".into(), "price".into())]);
 
-    println!(
-        "{:>6}  {:>6}  {:>8}  {:>8}  {:>10}  {:>10}",
-        "DATE", "ACTION", "PRICE", "SHARES", "CASH", "EQUITY"
-    );
-    println!("{}", "-".repeat(65));
-
-    let mut final_equity = 0.0;
-    for s in &signals {
-        println!(
-            "{:>6}  {:>6}  {:>8.2}  {:>8.0}  {:>10.2}  {:>10.2}",
-            s.date, s.action, s.price, s.shares, s.cash, s.equity
-        );
-        final_equity = s.equity;
-    }
-
-    println!("\nFinal equity: ${final_equity:.2}");
-    println!("Return: {:+.2}%", (final_equity - 10_000.0) / 100.0);
-}
-
-/// Run the strategy step-by-step, showing the View as translation boundary:
-/// source data has `"close"` → View yields step → rename `"close"` to
-/// `"price"` → strategy processes step → step (with `"price"`) appended to
-/// history.  The history accumulates in strategy format.
-fn run_with_signals(df: &DataFrame) -> Vec<Signal> {
     let strategy = SmaCross {
         initial_cash: 10_000.0,
         short_window: 5,
         long_window: 10,
     };
-    let view = DailyView::new("date");
+    let mut executor = SyncExecutor::new(strategy);
 
-    let mut history = DataFrame::empty();
-    let mut state = State { cash: 10_000.0, ..State::default() };
-    let mut signals = Vec::new();
+    let signals_df = executor.run(&df, view);
 
-    for (date, day_df) in view.steps(df) {
-        // --- View translation boundary ---
-        // Source data uses "close"; strategy expects "price".
-        let step = rename_column(&day_df, "close", "price");
-        // ---------------------------------
-
-        let signal = strategy.on_step(&(date, step.clone()), &history, &mut state);
-        view.append(&mut history, &(date, step));
-        signals.push(signal);
-    }
-
-    signals
+    println!("=== Signals ===\n{:?}", signals_df);
 }

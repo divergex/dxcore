@@ -13,8 +13,6 @@ use crate::core::{Instrument, Portfolio};
 use crate::interface::MarketApi;
 use crate::{Error, Event};
 
-/// Real implementation of [`MarketApi`] backed by an Interactive Brokers
-/// TWS / Gateway connection.
 pub struct IbkrInterface {
     host: String,
     client_id: i32,
@@ -160,12 +158,7 @@ impl MarketApi for IbkrInterface {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Convert ibapi [`Bar`](ibapi::market_data::historical::Bar) slice into a
-/// polars DataFrame with columns: date, open, high, low, close, volume.
+/// Convert ibapi [`Bar`](ibapi::market_data::historical::Bar) slice into a polars DataFrame 
 fn bars_to_dataframe(bars: &[ibapi::market_data::historical::Bar]) -> PolarsResult<DataFrame> {
     let dates: Vec<String> = bars.iter().map(|b| b.date.to_string()).collect();
     let opens: Vec<f64> = bars.iter().map(|b| b.open).collect();

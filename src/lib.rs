@@ -1,12 +1,8 @@
 
-// Re-export the types consumers need so they don't import ibapi directly.
 pub use ibapi::accounts::{AccountPortfolioValue, AccountValue};
 pub use ibapi::contracts::Contract;
 pub use ibapi::market_data::historical::{Bar, BarTimestamp};
 
-// ---------------------------------------------------------------------------
-// Event — what the worker thread pushes to the UI
-// ---------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub enum Event {
@@ -32,9 +28,6 @@ pub enum Event {
     },
 }
 
-// ---------------------------------------------------------------------------
-// Error
-// ---------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub enum Error {
@@ -52,10 +45,6 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-// ---------------------------------------------------------------------------
-// Modules
-// ---------------------------------------------------------------------------
 
 pub mod core;
 pub mod interface;

@@ -1,10 +1,7 @@
 use polars::prelude::*;
 
-use super::*;
+use cadlag::trading::*;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 fn ohlc_df() -> DataFrame {
     let date_col = Column::new(
@@ -28,10 +25,6 @@ fn empty_ohlc_df() -> DataFrame {
         Column::new_empty("close".into(), &DataType::Float64),
     ]).unwrap()
 }
-
-// ---------------------------------------------------------------------------
-// KeyedSchema
-// ---------------------------------------------------------------------------
 
 #[test]
 fn keyed_schema_value_cols_returns_non_key_columns() {
@@ -74,10 +67,6 @@ fn keyed_schema_deref_accesses_schema_methods() {
     assert_eq!(ks.get("nonexistent"), None);
 }
 
-// ---------------------------------------------------------------------------
-// TickView
-// ---------------------------------------------------------------------------
-
 #[test]
 fn tick_view_yields_one_row_per_original_row() {
     let df = ohlc_df();
@@ -112,13 +101,8 @@ fn tick_view_append_accumulates_rows() {
         view.append(&mut history, &step);
     }
 
-    // All 5 rows accumulated, sorted by original order.
     assert_eq!(history.height(), 5);
 }
-
-// ---------------------------------------------------------------------------
-// DailyView
-// ---------------------------------------------------------------------------
 
 #[test]
 fn daily_view_groups_by_date() {
@@ -176,10 +160,6 @@ fn daily_view_single_date_returns_one_step() {
     assert_eq!(steps[0].1.height(), 1);
 }
 
-// ---------------------------------------------------------------------------
-// PanelView
-// ---------------------------------------------------------------------------
-
 #[test]
 fn panel_view_groups_by_date_and_symbol() {
     let df = ohlc_df();
@@ -229,17 +209,13 @@ fn panel_view_append_accumulates_all_groups() {
     assert_eq!(history.height(), 5);
 }
 
-// ---------------------------------------------------------------------------
-// SyncExecutor
-// ---------------------------------------------------------------------------
-
-/// A strategy that counts steps via state.
 struct CountStrategy;
 
 impl Strategy for CountStrategy {
     type Input = DataFrame;
     type State = u32;
     type Output = u32;
+    type Frame = Vec<u32>;
 
     fn on_step(
         &self,
@@ -250,26 +226,34 @@ impl Strategy for CountStrategy {
         *state += 1;
         *state
     }
+
+    fn create_output(&self) -> Vec<u32> {
+        Vec::new()
+    }
+
+    fn append_output(&self, frame: &mut Vec<u32>, output: u32, _step: &DataFrame) {
+        frame.push(output);
+    }
 }
 
 #[test]
-fn sync_executor_runs_strategy_through_tick_view() {
+fn sync_executor_returns_frame() {
     let df = ohlc_df();
     let mut executor = SyncExecutor::new(CountStrategy);
 
-    let history = executor.run(&df, TickView::new("date"));
+    let frame = executor.run(&df, TickView::new("date"));
 
-    assert_eq!(history.height(), 5);
+    assert_eq!(frame, vec![1, 2, 3, 4, 5]);
 }
 
 #[test]
-fn sync_executor_empty_dataframe_yields_empty_history() {
+fn sync_executor_empty_dataframe_yields_empty_frame() {
     let df = empty_ohlc_df();
     let mut executor = SyncExecutor::new(CountStrategy);
 
-    let history = executor.run(&df, TickView::new("date"));
+    let frame = executor.run(&df, TickView::new("date"));
 
-    assert_eq!(history.height(), 0);
+    assert!(frame.is_empty());
 }
 
 #[test]
@@ -277,10 +261,10 @@ fn sync_executor_reusable_across_datasets() {
     let df1 = ohlc_df();
     let mut executor = SyncExecutor::new(CountStrategy);
 
-    let history1 = executor.run(&df1, TickView::new("date"));
-    assert_eq!(history1.height(), 5);
+    let frame1 = executor.run(&df1, TickView::new("date"));
+    assert_eq!(frame1.len(), 5);
 
     let df2 = empty_ohlc_df();
-    let history2 = executor.run(&df2, TickView::new("date"));
-    assert_eq!(history2.height(), 0);
+    let frame2 = executor.run(&df2, TickView::new("date"));
+    assert!(frame2.is_empty());
 }

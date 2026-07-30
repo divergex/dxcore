@@ -1,8 +1,8 @@
 use std::sync::mpsc;
 
-use dxcore_rs::interface::ibkr::IbkrInterface;
-use dxcore_rs::interface::MarketApi;
-use dxcore_rs::Event;
+use cadlag::interface::ibkr::IbkrInterface;
+use cadlag::interface::MarketApi;
+use cadlag::Event;
 
 fn main() {
     let _ = dotenvy::dotenv();

@@ -1,13 +1,9 @@
 use polars::prelude::*;
 
-use crate::core::{Instrument, Portfolio};
-use crate::interface::MockInterface;
-use crate::interface::MarketApi;
-use crate::{Error, Event};
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+use cadlag::core::{Instrument, Portfolio};
+use cadlag::interface::MockInterface;
+use cadlag::interface::MarketApi;
+use cadlag::{Error, Event};
 
 fn make_history_df() -> DataFrame {
     DataFrame::new(vec![
@@ -36,10 +32,6 @@ fn make_portfolio() -> Portfolio {
     );
     p
 }
-
-// ---------------------------------------------------------------------------
-// Mock — market_history
-// ---------------------------------------------------------------------------
 
 #[test]
 fn mock_market_history_returns_configured_df() {
@@ -82,10 +74,6 @@ fn mock_market_history_errors_when_no_history_configured() {
     assert!(result.is_err());
 }
 
-// ---------------------------------------------------------------------------
-// Mock — portfolio
-// ---------------------------------------------------------------------------
-
 #[test]
 fn mock_portfolio_returns_configured() {
     let portfolio = make_portfolio();
@@ -105,10 +93,6 @@ fn mock_portfolio_errors_when_no_portfolio_configured() {
     let result = mock.portfolio("U123");
     assert!(matches!(result, Err(Error::Connection(_))));
 }
-
-// ---------------------------------------------------------------------------
-// Mock — listen
-// ---------------------------------------------------------------------------
 
 #[test]
 fn mock_listen_sends_configured_events() {
@@ -149,9 +133,6 @@ fn mock_listen_empty_events_sends_nothing() {
     assert!(received.is_empty());
 }
 
-// ---------------------------------------------------------------------------
-// Integration tests — require `integration` feature and a running TWS/Gateway
-// ---------------------------------------------------------------------------
 
 #[cfg(feature = "integration")]
 mod integration {
@@ -160,9 +141,9 @@ mod integration {
 
     use ibapi::contracts::Contract;
 
-    use crate::interface::ibkr::IbkrInterface;
-    use crate::interface::MarketApi;
-    use crate::Event;
+    use cadlag::interface::ibkr::IbkrInterface;
+    use cadlag::interface::MarketApi;
+    use cadlag::Event;
 
     fn account_id() -> String {
         env::var("IB_ACCOUNT_ID").expect("IB_ACCOUNT_ID must be set for integration tests")
