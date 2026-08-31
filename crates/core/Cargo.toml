@@ -21,6 +21,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["time", "rt", "rt-multi-thread", "macros"] }
 tokio-stream = { version = "0.1", features = ["time"] }
 tiny_http = "0.12"
+uuid = { version = "1", features = ["v4"] }
 
 [[bin]]
 name = "dxlib"

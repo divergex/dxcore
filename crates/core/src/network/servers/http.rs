@@ -99,6 +99,10 @@ fn dispatch(
             Ok(value) => Request::Set { attribute, value },
             Err(response) => return response,
         },
+        Method::Post => match parse_json_body(request) {
+            Ok(value) => Request::Post { attribute, value },
+            Err(response) => return response,
+        },
         _ => return json_error(StatusCode(405), "method not allowed".into()),
     };
 

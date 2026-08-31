@@ -54,8 +54,13 @@ fn http_server_serves_get_set() {
     let resp = c.get(format!("{base}/nope")).send().unwrap();
     assert_eq!(resp.status(), 404);
 
-    // POST is not a mapped method → 405.
-    let resp = c.post(format!("{base}/value")).send().unwrap();
+    // POST is not accepted by attribute services -> 405.
+    let resp = c
+        .post(format!("{base}/value"))
+        .body("null")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
     assert_eq!(resp.status(), 405);
 
     // Bad JSON body on PUT → 400.

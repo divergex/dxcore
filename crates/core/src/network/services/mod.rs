@@ -20,6 +20,9 @@ pub enum Request {
     /// Write an attribute, or call a mutable method. `value` is the new
     /// attribute value, or the method arguments as JSON.
     Set { attribute: String, value: Value },
+    /// Create a resource, e.g. `POST /services` on a mesh. `value` is the
+    /// request body as JSON.
+    Post { attribute: String, value: Value },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,6 +55,17 @@ impl std::error::Error for ServiceError {}
 
 pub trait Service: Send + Sync {
     fn call(&self, request: Request) -> Result<Response, ServiceError>;
+
+    /// Name this service registers under in a mesh.
+    fn name(&self) -> String {
+        "service".into()
+    }
+
+    /// Endpoint paths this service serves, as `/path` strings. Empty for
+    /// services that address requests dynamically.
+    fn endpoints(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Accessors for one attribute of `T` whose value is of type `A`.
@@ -284,6 +298,15 @@ impl<T: Send + Sync + 'static> Service for AttributeService<T> {
                 let value = setter(&mut instance, value)?;
                 Ok(Response { value })
             }
+            Request::Post { attribute, .. } => Err(ServiceError::WriteOnly(attribute)),
         }
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn endpoints(&self) -> Vec<String> {
+        self.entries.keys().map(|name| format!("/{name}")).collect()
     }
 }

@@ -429,6 +429,7 @@ dependencies = [
  "tiny_http",
  "tokio",
  "tokio-stream",
+ "uuid",
 ]
 
 [[package]]
