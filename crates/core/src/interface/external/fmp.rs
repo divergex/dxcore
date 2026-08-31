@@ -1,5 +1,5 @@
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Error;
 
@@ -46,7 +46,7 @@ impl FmpClient {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
     pub symbol: String,
@@ -55,7 +55,7 @@ pub struct Profile {
     pub currency: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceSheet {
     pub symbol: String,
@@ -67,7 +67,7 @@ pub struct BalanceSheet {
     pub total_equity: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeStatement {
     pub symbol: String,

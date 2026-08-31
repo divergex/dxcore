@@ -91,7 +91,10 @@ fn dispatch(
     let attribute = request.url().trim_start_matches('/').to_string();
 
     let service_request = match request.method() {
-        Method::Get => Request::Get { attribute },
+        Method::Get => match parse_optional_json_body(request) {
+            Ok(args) => Request::Get { attribute, args },
+            Err(response) => return response,
+        },
         Method::Put => match parse_json_body(request) {
             Ok(value) => Request::Set { attribute, value },
             Err(response) => return response,
@@ -103,6 +106,23 @@ fn dispatch(
         Ok(ServiceResponse { value }) => json_response(value),
         Err(err) => json_error(status_for(&err), err.to_string()),
     }
+}
+
+/// Parse the request body as JSON, or `None` when the client sent no body.
+fn parse_optional_json_body(
+    request: &mut tiny_http::Request,
+) -> Result<Option<serde_json::Value>, Response<std::io::Cursor<Vec<u8>>>> {
+    let mut body = Vec::new();
+    request
+        .as_reader()
+        .read_to_end(&mut body)
+        .map_err(|e| json_error(StatusCode(400), e.to_string()))?;
+    if body.is_empty() {
+        return Ok(None);
+    }
+    serde_json::from_slice(&body)
+        .map(Some)
+        .map_err(|e| json_error(StatusCode(400), format!("invalid JSON body: {e}")))
 }
 
 fn parse_json_body(

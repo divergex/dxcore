@@ -10,7 +10,15 @@ use crate::serialization::{from_value, to_value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Request {
-    Get { attribute: String },
+    /// Read an attribute, or call an immutable method. `args` holds the
+    /// method arguments as JSON (a single value, or an array for multiple);
+    /// `None` for plain attribute reads.
+    Get {
+        attribute: String,
+        args: Option<Value>,
+    },
+    /// Write an attribute, or call a mutable method. `value` is the new
+    /// attribute value, or the method arguments as JSON.
     Set { attribute: String, value: Value },
 }
 
@@ -119,15 +127,15 @@ macro_rules! attribute {
     };
 }
 
-struct ErasedAttribute<T> {
-    getter: Option<Arc<dyn Fn(&T) -> Result<Value, ServiceError> + Send + Sync>>,
-    setter: Option<Arc<dyn Fn(&mut T, Value) -> Result<(), ServiceError> + Send + Sync>>,
+struct ErasedEntry<T> {
+    get: Option<Arc<dyn Fn(&T, Option<Value>) -> Result<Value, ServiceError> + Send + Sync>>,
+    set: Option<Arc<dyn Fn(&mut T, Value) -> Result<Value, ServiceError> + Send + Sync>>,
 }
 
 pub struct AttributeService<T> {
     name: String,
     instance: Arc<RwLock<T>>,
-    attributes: HashMap<String, ErasedAttribute<T>>,
+    entries: HashMap<String, ErasedEntry<T>>,
 }
 
 impl<T: Send + Sync + 'static> AttributeService<T> {
@@ -135,7 +143,7 @@ impl<T: Send + Sync + 'static> AttributeService<T> {
         Self {
             name: name.into(),
             instance: Arc::new(RwLock::new(instance)),
-            attributes: HashMap::new(),
+            entries: HashMap::new(),
         }
     }
 
@@ -154,26 +162,89 @@ impl<T: Send + Sync + 'static> AttributeService<T> {
     where
         A: Serialize + DeserializeOwned + Send + Sync + 'static,
     {
-        let erased = ErasedAttribute {
-            getter: attribute.getter.map(|getter| {
-                let erased: Arc<dyn Fn(&T) -> Result<Value, ServiceError> + Send + Sync> =
-                    Arc::new(move |t: &T| {
+        let entry = ErasedEntry {
+            get: attribute.getter.map(|getter| {
+                let erased: Arc<dyn Fn(&T, Option<Value>) -> Result<Value, ServiceError> + Send + Sync> =
+                    Arc::new(move |t: &T, _args: Option<Value>| {
                         let value = getter(t)?;
                         to_value(&value).map_err(|e| ServiceError::BadValue(e.to_string()))
                     });
                 erased
             }),
-            setter: attribute.setter.map(|setter| {
-                let erased: Arc<dyn Fn(&mut T, Value) -> Result<(), ServiceError> + Send + Sync> =
+            set: attribute.setter.map(|setter| {
+                let erased: Arc<dyn Fn(&mut T, Value) -> Result<Value, ServiceError> + Send + Sync> =
                     Arc::new(move |t: &mut T, v: Value| {
                         let value: A = from_value(v)
                             .map_err(|e| ServiceError::BadValue(e.to_string()))?;
-                        setter(t, value)
+                        setter(t, value)?;
+                        Ok(Value::Null)
                     });
                 erased
             }),
         };
-        self.attributes.insert(name.to_string(), erased);
+        self.entries.insert(name.to_string(), entry);
+        self
+    }
+
+    /// Register an immutable method: `GET`-only, arguments are deserialized
+    /// from the request with `from_value` and the return value is serialized
+    /// with `to_value`. `Args` is a single value for one parameter, or a
+    /// tuple for several.
+    pub fn with_get<Args, Ret>(
+        mut self,
+        name: &str,
+        method: impl Fn(&T, Args) -> Result<Ret, ServiceError> + Send + Sync + 'static,
+    ) -> Self
+    where
+        Args: DeserializeOwned + Send + Sync + 'static,
+        Ret: Serialize + Send + Sync + 'static,
+    {
+        let erased: Arc<dyn Fn(&T, Option<Value>) -> Result<Value, ServiceError> + Send + Sync> =
+            Arc::new(move |t: &T, args: Option<Value>| {
+                let args = args
+                    .ok_or_else(|| ServiceError::BadValue("method requires arguments".into()))?;
+                let args: Args = from_value(args)
+                    .map_err(|e| ServiceError::BadValue(e.to_string()))?;
+                let ret = method(t, args)?;
+                to_value(&ret).map_err(|e| ServiceError::BadValue(e.to_string()))
+            });
+        self.entries.insert(
+            name.to_string(),
+            ErasedEntry {
+                get: Some(erased),
+                set: None,
+            },
+        );
+        self
+    }
+
+    /// Register a mutable method: `PUT`-only, arguments are deserialized from
+    /// the request with `from_value` and the return value is serialized with
+    /// `to_value`. `Args` is a single value for one parameter, or a tuple
+    /// for several.
+    pub fn with_set<Args, Ret>(
+        mut self,
+        name: &str,
+        method: impl Fn(&mut T, Args) -> Result<Ret, ServiceError> + Send + Sync + 'static,
+    ) -> Self
+    where
+        Args: DeserializeOwned + Send + Sync + 'static,
+        Ret: Serialize + Send + Sync + 'static,
+    {
+        let erased: Arc<dyn Fn(&mut T, Value) -> Result<Value, ServiceError> + Send + Sync> =
+            Arc::new(move |t: &mut T, args: Value| {
+                let args: Args = from_value(args)
+                    .map_err(|e| ServiceError::BadValue(e.to_string()))?;
+                let ret = method(t, args)?;
+                to_value(&ret).map_err(|e| ServiceError::BadValue(e.to_string()))
+            });
+        self.entries.insert(
+            name.to_string(),
+            ErasedEntry {
+                get: None,
+                set: Some(erased),
+            },
+        );
         self
     }
 }
@@ -181,37 +252,37 @@ impl<T: Send + Sync + 'static> AttributeService<T> {
 impl<T: Send + Sync + 'static> Service for AttributeService<T> {
     fn call(&self, request: Request) -> Result<Response, ServiceError> {
         match request {
-            Request::Get { attribute } => {
-                let attr = self
-                    .attributes
+            Request::Get { attribute, args } => {
+                let entry = self
+                    .entries
                     .get(&attribute)
                     .ok_or_else(|| ServiceError::UnknownAttribute(attribute.clone()))?;
-                let getter = attr
-                    .getter
+                let getter = entry
+                    .get
                     .as_ref()
                     .ok_or_else(|| ServiceError::ReadOnly(attribute))?;
                 let instance = self
                     .instance
                     .read()
                     .map_err(|_| ServiceError::Internal("instance lock poisoned".into()))?;
-                let value = getter(&instance)?;
+                let value = getter(&instance, args)?;
                 Ok(Response { value })
             }
             Request::Set { attribute, value } => {
-                let attr = self
-                    .attributes
+                let entry = self
+                    .entries
                     .get(&attribute)
                     .ok_or_else(|| ServiceError::UnknownAttribute(attribute.clone()))?;
-                let setter = attr
-                    .setter
+                let setter = entry
+                    .set
                     .as_ref()
                     .ok_or_else(|| ServiceError::WriteOnly(attribute))?;
                 let mut instance = self
                     .instance
                     .write()
                     .map_err(|_| ServiceError::Internal("instance lock poisoned".into()))?;
-                setter(&mut instance, value)?;
-                Ok(Response { value: Value::Null })
+                let value = setter(&mut instance, value)?;
+                Ok(Response { value })
             }
         }
     }

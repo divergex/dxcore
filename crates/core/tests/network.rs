@@ -136,3 +136,77 @@ fn attributes_control_exposure() {
 
     handle.stop().unwrap();
 }
+
+struct Ledger {
+    balance: i64,
+}
+
+#[test]
+fn services_register_methods() {
+    let service = AttributeService::new("ledger", Ledger { balance: 100 })
+        .with_get("lookup", |l: &Ledger, account: String| {
+            Ok(format!("{account}:{}", l.balance))
+        })
+        .with_set("add", |l: &mut Ledger, (account, amount): (String, i64)| {
+            l.balance += amount;
+            Ok(format!("{account}:{}", l.balance))
+        });
+    let (base, handle) = spawn_server(Arc::new(service));
+    let c = client();
+
+    // Immutable method: args deserialized from the GET body, response serialized.
+    let resp = c
+        .get(format!("{base}/lookup"))
+        .body("\"checking\"")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.text().unwrap(), "\"checking:100\"");
+
+    // Mutable method: tuple args deserialized, state mutated, result returned.
+    let resp = c
+        .put(format!("{base}/add"))
+        .body("[\"checking\", 5]")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.text().unwrap(), "\"checking:105\"");
+
+    // The mutation is visible to the next read.
+    let resp = c
+        .get(format!("{base}/lookup"))
+        .body("\"checking\"")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.text().unwrap(), "\"checking:105\"");
+
+    // Missing args on an immutable method -> 400.
+    let resp = c.get(format!("{base}/lookup")).send().unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // Args of the wrong shape -> 400.
+    let resp = c
+        .get(format!("{base}/lookup"))
+        .body("42")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // Immutable methods reject writes, mutable methods reject reads.
+    let resp = c
+        .put(format!("{base}/lookup"))
+        .body("null")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.status(), 405);
+
+    let resp = c.get(format!("{base}/add")).send().unwrap();
+    assert_eq!(resp.status(), 405);
+
+    handle.stop().unwrap();
+}
