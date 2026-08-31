@@ -1,6 +1,6 @@
 #[cfg(feature = "integration")]
 mod integration {
-    use dxlib::interface::external::guardian;
+    use dxcore::interface::external::guardian;
     use std::env;
 
     fn api_key() -> String {

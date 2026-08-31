@@ -1,9 +1,9 @@
-//! Thin Python bindings over the `dxlib` core library.
+//! Thin Python bindings over the `dxcore` core library.
 
-use ::dxlib::core::{AccountMetric, Instrument, InstrumentStore, Portfolio};
+use ::dxcore::core::{AccountMetric, Instrument, InstrumentStore, Portfolio};
 use pyo3::prelude::*;
 
-#[pyclass(name = "Instrument", module = "dxlib", from_py_object)]
+#[pyclass(name = "Instrument", module = "dxcore", from_py_object)]
 #[derive(Clone)]
 pub struct PyInstrument {
     inner: Instrument,
@@ -61,7 +61,7 @@ impl PyInstrument {
     }
 }
 
-#[pyclass(name = "AccountMetric", module = "dxlib", from_py_object)]
+#[pyclass(name = "AccountMetric", module = "dxcore", from_py_object)]
 #[derive(Clone)]
 pub struct PyAccountMetric {
     inner: AccountMetric,
@@ -97,7 +97,7 @@ impl PyAccountMetric {
     }
 }
 
-#[pyclass(name = "Portfolio", module = "dxlib", from_py_object)]
+#[pyclass(name = "Portfolio", module = "dxcore", from_py_object)]
 #[derive(Clone)]
 pub struct PyPortfolio {
     inner: Portfolio,
@@ -151,7 +151,7 @@ impl PyPortfolio {
     }
 }
 
-#[pyclass(name = "InstrumentStore", module = "dxlib", from_py_object)]
+#[pyclass(name = "InstrumentStore", module = "dxcore", from_py_object)]
 #[derive(Clone)]
 pub struct PyInstrumentStore {
     inner: InstrumentStore,
@@ -198,7 +198,7 @@ impl PyInstrumentStore {
 }
 
 #[pymodule]
-fn dxlib(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn dxcore(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyInstrument>()?;
     m.add_class::<PyAccountMetric>()?;
     m.add_class::<PyPortfolio>()?;

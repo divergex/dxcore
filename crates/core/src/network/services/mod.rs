@@ -112,7 +112,7 @@ impl<T: 'static, A: Send + Sync + 'static> Attribute<T, A> {
 /// the attribute to getter-only (e.g. an id that must not be editable).
 ///
 /// ```ignore
-/// use dxlib::attribute;
+/// use dxcore::attribute;
 ///
 /// // get + set:
 /// attribute!("metrics", &portfolio.metrics);

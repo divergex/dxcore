@@ -1,5 +1,5 @@
 use polars::prelude::*;
-use dxlib::trading::{TickView, View};
+use dxcore::trading::{TickView, View};
 
 use super::helpers;
 

@@ -5,10 +5,10 @@ use std::sync::Arc;
 use reqwest::blocking::Client;
 use serde_json::Value;
 
-use dxlib::attribute;
-use dxlib::core::Portfolio;
-use dxlib::network::servers::{HttpServer, ServerHandle};
-use dxlib::network::services::{Attribute, AttributeService, Service, ServiceError};
+use dxcore::attribute;
+use dxcore::core::Portfolio;
+use dxcore::network::servers::{HttpServer, ServerHandle};
+use dxcore::network::services::{Attribute, AttributeService, Service, ServiceError};
 
 /// Bind a server on an ephemeral port, spawn it, return base URL + handle.
 fn spawn_server(service: Arc<dyn Service>) -> (String, ServerHandle) {

@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Data and trading library of the Divergex ecosystem: market data, portfolios, services, and mesh networking"
 license = "MIT"
-repository = "https://github.com/divergex/dxlib"
+repository = "https://github.com/divergex/dxcore"
 
 # Keep dev builds lean: full debuginfo made artifacts ~10x bigger (500M+).
 # "line-tables-only" keeps file:line in backtraces while dropping the bulk.

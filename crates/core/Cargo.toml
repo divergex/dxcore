@@ -1,5 +1,5 @@
 [package]
-name = "dxlib"
+name = "dxcore"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -27,7 +27,7 @@ tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
 
 [[bin]]
-name = "dxlib"
+name = "dxcore"
 path = "src/main.rs"
 
 [[example]]

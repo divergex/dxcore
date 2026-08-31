@@ -1,14 +1,14 @@
 [package]
-name = "dxlib-pyo3"
+name = "dxcore-pyo3"
 version.workspace = true
 edition.workspace = true
 
 [lib]
-name = "dxlib_pyo3"
+name = "dxcore_pyo3"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-dxlib = { path = "../core" }
+dxcore = { path = "../core" }
 pyo3 = { version = "0.29", features = ["abi3-py39"] }
 
 # maturin enables this when building the wheel; keeping it off by default

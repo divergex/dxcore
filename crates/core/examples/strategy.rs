@@ -3,8 +3,8 @@
 //! Run with: `cargo run --example strategy --features strategies`
 
 use polars::prelude::*;
-use dxlib::strategies::SmaCross;
-use dxlib::trading::{DailyView, SyncExecutor};
+use dxcore::strategies::SmaCross;
+use dxcore::trading::{DailyView, SyncExecutor};
 
 fn generate_ohlc(n_days: usize) -> DataFrame {
     let prices: Vec<f64> = (0..n_days)

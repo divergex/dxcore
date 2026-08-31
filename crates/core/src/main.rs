@@ -3,11 +3,11 @@ mod cli;
 #[cfg(feature = "ibkr")]
 use std::sync::mpsc;
 #[cfg(feature = "ibkr")]
-use dxlib::interface::external::ibkr::IbkrInterface;
+use dxcore::interface::external::ibkr::IbkrInterface;
 #[cfg(feature = "ibkr")]
-use dxlib::interface::MarketApi;
+use dxcore::interface::MarketApi;
 #[cfg(feature = "ibkr")]
-use dxlib::Event;
+use dxcore::Event;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -36,7 +36,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprint!("usage: dxlib");
+    eprint!("usage: dxcore");
     eprint!(" [mesh <start|stop>]");
     #[cfg(feature = "strategies")]
     eprint!(" [strategies <name> ...]");
@@ -45,8 +45,8 @@ fn print_usage() {
 
 #[cfg(feature = "strategies")]
 fn run_strategies(args: &[String]) {
-    use dxlib::strategies::SmaCross;
-    use dxlib::trading::{DailyView, SyncExecutor};
+    use dxcore::strategies::SmaCross;
+    use dxcore::trading::{DailyView, SyncExecutor};
     use polars::prelude::*;
 
     if args.is_empty() {

@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use dxlib::interface::external::xbrl;
-use dxlib::interface::stream::poll;
+use dxcore::interface::external::xbrl;
+use dxcore::interface::stream::poll;
 use tokio_stream::StreamExt;
 
 #[tokio::main]

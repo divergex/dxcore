@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use dxlib::interface::stream::{poll, poll_callback};
+use dxcore::interface::stream::{poll, poll_callback};
 use tokio_stream::StreamExt;
 
 #[tokio::test]

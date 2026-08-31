@@ -5,7 +5,7 @@ use std::process::Command;
 use std::time::Duration;
 
 fn pid_file() -> PathBuf {
-    std::env::temp_dir().join("dxlib-mesh.pid")
+    std::env::temp_dir().join("dxcore-mesh.pid")
 }
 
 fn process_alive(pid: i32) -> bool {
@@ -19,7 +19,7 @@ fn process_alive(pid: i32) -> bool {
 #[test]
 fn mesh_start_stop_detached() {
     let _ = std::fs::remove_file(pid_file());
-    let bin = env!("CARGO_BIN_EXE_dxlib");
+    let bin = env!("CARGO_BIN_EXE_dxcore");
 
     let status = Command::new(bin)
         .args(["mesh", "start", "--host", "127.0.0.1", "--port", "0", "--detached"])

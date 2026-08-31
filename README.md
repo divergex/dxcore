@@ -1,6 +1,6 @@
-# dxlib
+# dxcore
 
-**dxlib** is the data and trading library of the Divergex ecosystem.
+**dxcore** is the data and trading library of the Divergex ecosystem.
 It is written in Rust, with Python bindings on top,
 and aims to cover the basic networking, datastructures and pieces you need to
 build your own quantitative research and trading setup.
@@ -20,13 +20,13 @@ For now, the more interesting modules are:
 - **Services**: register and talk between services with a small request/response layer (for now only a built-in HTTP server).
 This is where the service discovery pieces that used to live in dxforge ended up.
 - **Python bindings**: the same core functionality is exposed to Python via
-  the `dxlib-pyo3` crate.
+  the `dxcore-pyo3` crate.
 
 ## Getting Started
 
 This is a Rust workspace with two crates:
 
-- `crates/core` — the `dxlib` library itself
+- `crates/core` — the `dxcore` library itself
 - `crates/pybindings` — Python bindings (built with maturin)
 
 Build everything with:
@@ -52,7 +52,7 @@ cargo run --example strategy --features strategies
 
 ## In the Ecosystem
 
-dxlib works alongside the other Divergex components: `dxforge` handles
+dxcore works alongside the other Divergex components: `dxforge` handles
 orchestration and containerized deployments, while `cadlag` covers data
 streams.
 

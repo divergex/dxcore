@@ -13,9 +13,9 @@
 
 use std::sync::Arc;
 
-use dxlib::interface::external::fmp::FmpClient;
-use dxlib::network::servers::HttpServer;
-use dxlib::network::services::{AttributeService, ServiceError};
+use dxcore::interface::external::fmp::FmpClient;
+use dxcore::network::servers::HttpServer;
+use dxcore::network::services::{AttributeService, ServiceError};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenvy::dotenv();

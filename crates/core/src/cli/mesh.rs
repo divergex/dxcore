@@ -1,24 +1,24 @@
 //! The `mesh` subcommand: run a mesh server from the command line.
 //!
-//! `dxlib mesh start [--host <host>] [--port <port>] [--detached]` serves a
+//! `dxcore mesh start [--host <host>] [--port <port>] [--detached]` serves a
 //! fresh `MeshService`. With `--detached` it runs in the background, tracked
-//! by a pid file, and is stopped with `dxlib mesh stop`.
+//! by a pid file, and is stopped with `dxcore mesh stop`.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use dxlib::network::mesh::MeshService;
-use dxlib::network::servers::HttpServer;
+use dxcore::network::mesh::MeshService;
+use dxcore::network::servers::HttpServer;
 
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 8080;
-const PID_FILE: &str = "dxlib-mesh.pid";
+const PID_FILE: &str = "dxcore-mesh.pid";
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub fn run(args: &[String]) {
     let Some(command) = args.first() else {
-        eprintln!("usage: dxlib mesh <start|stop>");
+        eprintln!("usage: dxcore mesh <start|stop>");
         return;
     };
     match command.as_str() {
@@ -26,7 +26,7 @@ pub fn run(args: &[String]) {
         "stop" => stop(),
         other => {
             eprintln!("unknown mesh command: {other}");
-            eprintln!("usage: dxlib mesh <start|stop>");
+            eprintln!("usage: dxcore mesh <start|stop>");
         }
     }
 }
@@ -174,5 +174,5 @@ fn default_pid_file() -> PathBuf {
 
 fn err(message: &str) {
     eprintln!("{message}");
-    eprintln!("usage: dxlib mesh start [--host <host>] [--port <port>] [--detached]");
+    eprintln!("usage: dxcore mesh start [--host <host>] [--port <port>] [--detached]");
 }

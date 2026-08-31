@@ -1,5 +1,5 @@
 use polars::prelude::*;
-use dxlib::trading::{PanelStep, PanelView, View};
+use dxcore::trading::{PanelStep, PanelView, View};
 
 use super::helpers;
 

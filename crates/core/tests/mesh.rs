@@ -4,9 +4,9 @@ use std::sync::Arc;
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
 
-use dxlib::network::mesh::{MeshService, Protocol};
-use dxlib::network::servers::{HttpServer, ServerHandle};
-use dxlib::network::services::{AttributeService, Service};
+use dxcore::network::mesh::{MeshService, Protocol};
+use dxcore::network::servers::{HttpServer, ServerHandle};
+use dxcore::network::services::{AttributeService, Service};
 
 fn spawn_server(service: Arc<dyn Service>) -> (String, ServerHandle) {
     let server = HttpServer::bind("127.0.0.1:0", service).unwrap();

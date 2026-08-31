@@ -1,6 +1,6 @@
 use polars::prelude::*;
 use futures::StreamExt;
-use dxlib::trading::{AsyncExecutor, Strategy, TickView, View};
+use dxcore::trading::{AsyncExecutor, Strategy, TickView, View};
 
 use super::helpers;
 

@@ -13,12 +13,12 @@ use std::time::Duration;
 use futures::StreamExt;
 use polars::prelude::*;
 
-use dxlib::interface::external::fmp::FmpClient;
-use dxlib::interface::external::ibkr::IbkrInterface;
-use dxlib::interface::stream::poll;
-use dxlib::interface::MarketApi;
-use dxlib::strategies::five_factor::{FiveFactor, Source};
-use dxlib::trading::{AsyncExecutor, DailyView};
+use dxcore::interface::external::fmp::FmpClient;
+use dxcore::interface::external::ibkr::IbkrInterface;
+use dxcore::interface::stream::poll;
+use dxcore::interface::MarketApi;
+use dxcore::strategies::five_factor::{FiveFactor, Source};
+use dxcore::trading::{AsyncExecutor, DailyView};
 use ibapi::contracts::Contract;
 use ibapi::market_data::historical::{BarSize, ToDuration};
 
@@ -43,7 +43,7 @@ async fn main() {
             async move {
                 tokio::task::spawn_blocking(move || fetch_fundamentals(&fmp))
                     .await
-                    .map_err(|e| dxlib::Error::Connection(e.to_string()))?
+                    .map_err(|e| dxcore::Error::Connection(e.to_string()))?
             }
         })
         .map(|r| r.expect("fundamentals fetch"))
@@ -58,7 +58,7 @@ async fn main() {
             async move {
                 tokio::task::spawn_blocking(move || fetch_returns(&ibkr))
                     .await
-                    .map_err(|e| dxlib::Error::Connection(e.to_string()))?
+                    .map_err(|e| dxcore::Error::Connection(e.to_string()))?
             }
         })
         .map(|r| r.expect("returns fetch"))
@@ -94,7 +94,7 @@ async fn main() {
 }
 
 
-fn fetch_fundamentals(fmp: &FmpClient) -> Result<(i32, DataFrame), dxlib::Error> {
+fn fetch_fundamentals(fmp: &FmpClient) -> Result<(i32, DataFrame), dxcore::Error> {
     let mut symbols: Vec<String> = Vec::new();
     let mut dates: Vec<i32> = Vec::new();
     let mut shares: Vec<f64> = Vec::new();
@@ -143,7 +143,7 @@ fn fetch_fundamentals(fmp: &FmpClient) -> Result<(i32, DataFrame), dxlib::Error>
         Column::new("operating_income".into(), op_incomes),
         Column::new("total_assets".into(), total_assets),
     ])
-    .map_err(|e| dxlib::Error::Connection(e.to_string()))?;
+    .map_err(|e| dxcore::Error::Connection(e.to_string()))?;
 
 
     Ok((step_date, df))
@@ -173,7 +173,7 @@ fn parse_fmp_date(s: &str) -> i32 {
 }
 
 
-fn fetch_returns(ibkr: &IbkrInterface) -> Result<(i32, DataFrame), dxlib::Error> {
+fn fetch_returns(ibkr: &IbkrInterface) -> Result<(i32, DataFrame), dxcore::Error> {
     let mut symbols: Vec<String> = Vec::new();
     let mut dates: Vec<i32> = Vec::new();
     let mut prices: Vec<f64> = Vec::new();
@@ -182,7 +182,7 @@ fn fetch_returns(ibkr: &IbkrInterface) -> Result<(i32, DataFrame), dxlib::Error>
         let contract = Contract::stock(sym).build();
         let df = ibkr
             .market_history(&contract, BarSize::Day, 2.days())
-            .map_err(|e| dxlib::Error::Connection(e.to_string()))?;
+            .map_err(|e| dxcore::Error::Connection(e.to_string()))?;
 
         if df.height() == 0 {
             continue;
@@ -216,7 +216,7 @@ fn fetch_returns(ibkr: &IbkrInterface) -> Result<(i32, DataFrame), dxlib::Error>
         Column::new("symbol".into(), symbols),
         Column::new("price".into(), prices),
     ])
-    .map_err(|e| dxlib::Error::Connection(e.to_string()))?;
+    .map_err(|e| dxcore::Error::Connection(e.to_string()))?;
 
 
     Ok((step_date, df))

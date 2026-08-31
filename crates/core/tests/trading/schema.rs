@@ -1,5 +1,5 @@
 use polars::prelude::*;
-use dxlib::trading::KeyedSchema;
+use dxcore::trading::KeyedSchema;
 
 #[test]
 fn value_cols_returns_non_key_columns() {

@@ -2,10 +2,10 @@
 
 use polars::prelude::*;
 
-use dxlib::core::{Instrument, Portfolio};
-use dxlib::interface::MockInterface;
-use dxlib::interface::MarketApi;
-use dxlib::{Error, Event};
+use dxcore::core::{Instrument, Portfolio};
+use dxcore::interface::MockInterface;
+use dxcore::interface::MarketApi;
+use dxcore::{Error, Event};
 
 fn make_history_df() -> DataFrame {
     DataFrame::new(vec![
@@ -143,9 +143,9 @@ mod integration {
 
     use ibapi::contracts::Contract;
 
-    use dxlib::interface::external::ibkr::IbkrInterface;
-    use dxlib::interface::MarketApi;
-    use dxlib::Event;
+    use dxcore::interface::external::ibkr::IbkrInterface;
+    use dxcore::interface::MarketApi;
+    use dxcore::Event;
 
     fn account_id() -> String {
         env::var("IB_ACCOUNT_ID").expect("IB_ACCOUNT_ID must be set for integration tests")

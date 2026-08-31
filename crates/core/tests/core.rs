@@ -1,4 +1,4 @@
-use dxlib::core::*;
+use dxcore::core::*;
 
 
 fn make_instrument(id: i32, symbol: &str) -> Instrument {

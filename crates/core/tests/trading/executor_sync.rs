@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use polars::prelude::*;
-use dxlib::trading::{
+use dxcore::trading::{
     DailyView, Strategy, StreamedStrategy, SyncExecutor, TickView,
 };
 

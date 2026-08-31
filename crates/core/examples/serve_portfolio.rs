@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
-use dxlib::attribute;
-use dxlib::core::Portfolio;
-use dxlib::network::servers::HttpServer;
-use dxlib::network::services::{Attribute, AttributeService, ServiceError};
+use dxcore::attribute;
+use dxcore::core::Portfolio;
+use dxcore::network::servers::HttpServer;
+use dxcore::network::services::{Attribute, AttributeService, ServiceError};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = std::env::args().nth(1).unwrap_or_else(|| "8080".into());

@@ -1,6 +1,6 @@
 #[cfg(feature = "integration")]
 mod integration {
-    use dxlib::interface::external::xbrl;
+    use dxcore::interface::external::xbrl;
 
     #[test]
     fn returns_filings_for_ticker() {

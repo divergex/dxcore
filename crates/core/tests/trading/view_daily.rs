@@ -1,5 +1,5 @@
 use polars::prelude::*;
-use dxlib::trading::{DailyView, View};
+use dxcore::trading::{DailyView, View};
 
 use super::helpers;
 
