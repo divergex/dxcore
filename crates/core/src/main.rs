@@ -1,7 +1,12 @@
-use std::sync::mpsc;
+mod cli;
 
+#[cfg(feature = "ibkr")]
+use std::sync::mpsc;
+#[cfg(feature = "ibkr")]
 use dxlib::interface::external::ibkr::IbkrInterface;
+#[cfg(feature = "ibkr")]
 use dxlib::interface::MarketApi;
+#[cfg(feature = "ibkr")]
 use dxlib::Event;
 
 fn main() {
@@ -9,6 +14,10 @@ fn main() {
 
     if args.len() > 1 {
         match args[1].as_str() {
+            "mesh" => {
+                cli::mesh::run(&args[2..]);
+                return;
+            }
             #[cfg(feature = "strategies")]
             "strategies" => {
                 run_strategies(&args[2..]);
@@ -22,11 +31,13 @@ fn main() {
         }
     }
 
+    #[cfg(feature = "ibkr")]
     run_ibkr();
 }
 
 fn print_usage() {
     eprint!("usage: dxlib");
+    eprint!(" [mesh <start|stop>]");
     #[cfg(feature = "strategies")]
     eprint!(" [strategies <name> ...]");
     eprintln!();
@@ -109,6 +120,7 @@ fn generate_ohlc(n_days: usize) -> polars::prelude::DataFrame {
     .unwrap()
 }
 
+#[cfg(feature = "ibkr")]
 fn run_ibkr() {
     let _ = dotenvy::dotenv();
 

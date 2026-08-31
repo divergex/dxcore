@@ -10,9 +10,6 @@
 //! - `curl -X GET http://127.0.0.1:8080/profile -d '"AAPL"'`
 //! - `curl -X GET http://127.0.0.1:8080/balance_sheet -d '"AAPL"'`
 //! - `curl -X GET http://127.0.0.1:8080/income_statement -d '"AAPL"'`
-//!
-//! Methods are read-only by construction: `PUT` returns 405. Requires
-//! `FMP_API_KEY` (reads `.env`).
 
 use std::sync::Arc;
 
