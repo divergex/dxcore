@@ -1,0 +1,17 @@
+[package]
+name = "dxlib-pyo3"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "dxlib_pyo3"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dxlib = { path = "../core" }
+pyo3 = { version = "0.29", features = ["abi3-py39"] }
+
+# maturin enables this when building the wheel; keeping it off by default
+# lets `cargo test` link the crate without a host Python embedding.
+[features]
+extension-module = ["pyo3/extension-module"]

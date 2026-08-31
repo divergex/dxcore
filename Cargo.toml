@@ -1,19 +1,12 @@
-[package]
-name = "cadlag"
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/pybindings"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
-[features]
-integration = []
-
-[dependencies]
-ibapi = { git = "https://github.com/rzimmerdev/rust-ibapi", features = [
-  "sync",
-], default-features = false }
-futures = { version = "0.3", default-features = false, features = ["std"] }
-dotenvy = "0.15"
-polars = { version = "0.46", features = ["dtype-date", "strings"] }
-
-[[example]]
-name = "strategy"
-path = "demo/strategy.rs"
+# Keep dev builds lean: full debuginfo made artifacts ~10x bigger (500M+).
+# "line-tables-only" keeps file:line in backtraces while dropping the bulk.
+[profile.dev]
+debug = "line-tables-only"
