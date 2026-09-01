@@ -14,6 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # PyPI refuses re-uploads, so every release must build a new version.
+      # Derive it from the release tag (e.g. "v0.1.1" -> 0.1.1) rather than
+      # the dev default in pyproject.toml.
+      - name: Set version from release tag
+        run: |
+          version="${{ github.event.release.tag_name }}"
+          version="${version#v}"
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' || {
+            echo "release tag '${{ github.event.release.tag_name }}' is not a semantic version" >&2
+            exit 1
+          }
+          sed -i "s/^version = .*/version = \"$version\"/" pyproject.toml
+
       # Builds inside a manylinux container so the wheel gets a portable
       # manylinux tag instead of a host-specific linux_x86_64 one (PyPI
       # rejects untagged Linux wheels).
