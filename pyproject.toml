@@ -24,6 +24,9 @@ manifest-path = "crates/pybindings/Cargo.toml"
 module-name = "dxcore"
 bindings = "pyo3"
 features = ["extension-module", "ibkr"]
+# PEP 639 auto-detects LICENSE from `license = "MIT"` and declares it in the
+# metadata, but maturin's sdist otherwise omits it; PyPI rejects the sdist.
+include = ["LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["crates/pybindings/tests"]
