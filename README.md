@@ -1,8 +1,6 @@
 # dxcore
 
-**dxcore** is the data and trading library of the Divergex ecosystem.
-Covers the basic networking, datastructures and pieces need to
-build your own quantitative research and trading setup.
+**dxcore** is the backbone for data processing, networking and core structures for dx libraries.
 
 Mainly a toolkit for pulling market data, tracking portfolios,
 serving networks/meshes of strategies, and talking between services.
@@ -29,10 +27,7 @@ and more in the future!
 
 ## Getting Started
 
-This is a Rust workspace with two crates:
-
-- `crates/core` — the `dxcore` library itself
-- `crates/pybindings` — Python bindings (built with maturin)
+This is a Rust workspace with two crates: `crates/core` is the Rust code for the library itself, while `crates/pybindings` are the Python bindings
 
 Build everything with:
 
@@ -58,7 +53,7 @@ cargo run --example strategy --features strategies
 ## In the Ecosystem
 
 dxcore works alongside the other Divergex components:
-[dxforge](https://github.com/divergex/dxforge) handles orchestration and containerized deployments, while **cadlag** network interfaces, input sources, and serving strategies.
+[dxforge](https://github.com/divergex/dxforge) handles orchestration and containerized deployments, while [cadlag](https://github.com/divergex/cadlag] has the actual code for strategies.
 
 ## License
 
