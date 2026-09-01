@@ -15,6 +15,9 @@ pyo3 = { version = "0.29", features = ["abi3-py39"] }
 # core crate's version so `DataFrame` is the same type on both sides.
 polars = { version = "0.46", features = ["ipc"] }
 
+# JSON values cross the service boundary as Python objects.
+serde_json = "1"
+
 # Stream trait + StreamExt for the async executor bridge.
 futures = { version = "0.3", default-features = false, features = ["std"] }
 

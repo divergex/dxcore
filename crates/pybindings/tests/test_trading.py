@@ -1,46 +1,18 @@
-"""Tests for the dxcore Python bindings.
+"""Tests for the dxcore trading executor bindings.
 
-Requires the extension module built once:
-
-    cargo build -p dxcore-pyo3 --features extension-module
-
-Run with: python -m pytest crates/pybindings/tests/test_bindings.py
+Requires the compiled extension: cargo build -p dxcore-pyo3 --features extension-module.
 """
 
 import datetime
-import importlib.util
-import os
 import threading
 import time
-from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
+from collections.abc import Iterator
 
 import polars as pl
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-
-
-def _load_extension() -> Any:
-    candidates = []
-    if so := os.environ.get("DXCORE_SO"):
-        candidates.append(Path(so).resolve())
-    candidates += [
-        _REPO_ROOT / "target" / "release" / "libdxcore_pyo3.so",
-        _REPO_ROOT / "target" / "debug" / "libdxcore_pyo3.so",
-    ]
-    so_path = next((p for p in candidates if p.exists()), None)
-    if so_path is None:
-        pytest.skip("extension module not built; run `cargo build -p dxcore-pyo3 --features extension-module`")
-    spec = importlib.util.spec_from_file_location("dxcore", so_path)
-    if spec is None or spec.loader is None:
-        pytest.skip(f"could not load extension module from {so_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-dxcore: Any = _load_extension()
+import dxcore
 
 
 def _ohlc_df(n: int = 10) -> pl.DataFrame:
@@ -101,27 +73,12 @@ class Boom:
         pass
 
 
-def test_core_model():
-    p = dxcore.Portfolio()
-    p.upsert_metric("NetLiquidation", "100000", "USD")
-    inst = dxcore.Instrument(1, "AAPL", "STK", "SMART", "USD")
-    p.set_holding(inst, 100.0)
-    assert p.quantity(1) == 100.0
-    assert p.holding_count() == 1
-    assert p.metrics()[0].key == "NetLiquidation"
-    assert p.holdings()[0][0].symbol == "AAPL"
-
-    store = dxcore.InstrumentStore()
-    store.insert(inst)
-    assert store.get(1).symbol == "AAPL"
-    assert store.get_by_symbol("AAPL").contract_id == 1
-    assert len(store) == 1
-
-
 def test_sync_executor_runs_protocol():
     df = _ohlc_df()
     strategy = Recorder()
-    frame = dxcore.Executor(strategy).run(df, dxcore.DailyView("date", [("close", "price")]))
+    frame = dxcore.Executor(strategy).run(
+        df, dxcore.DailyView("date", [("close", "price")])
+    )
 
     n = df.height
     assert frame.height == n
@@ -190,15 +147,3 @@ def test_async_early_drop_stops_producer():
     while threading.active_count() > baseline and time.monotonic() < deadline:
         time.sleep(0.01)
     assert threading.active_count() <= baseline
-
-
-def test_fmp_from_env_requires_key(monkeypatch):
-    monkeypatch.delenv("FMP_API_KEY", raising=False)
-    with pytest.raises(RuntimeError, match="FMP_API_KEY"):
-        dxcore.FmpClient.from_env()
-
-
-def test_data_source_construction():
-    assert isinstance(dxcore.FmpClient("dummy-key"), dxcore.FmpClient)
-    assert isinstance(dxcore.GuardianClient("dummy-key"), dxcore.GuardianClient)
-    assert isinstance(dxcore.XbrlClient(), dxcore.XbrlClient)

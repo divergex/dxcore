@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "dxcore"
 version = "0.1.0"
 description = "Backbone for data processing, networking and core structures for dx libraries."
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
     "polars>=1.0",
@@ -24,6 +24,7 @@ manifest-path = "crates/pybindings/Cargo.toml"
 module-name = "dxcore"
 bindings = "pyo3"
 features = ["extension-module", "ibkr"]
+python-source = "python"
 # PEP 639 auto-detects LICENSE from `license = "MIT"` and declares it in the
 # metadata, but maturin's sdist otherwise omits it; PyPI rejects the sdist.
 include = ["LICENSE"]
