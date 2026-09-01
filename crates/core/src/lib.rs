@@ -1,4 +1,6 @@
 
+#![doc = include_str!("../../../docs/guides/getting-started.md")]
+
 #[cfg(feature = "ibkr")]
 pub use ibapi::accounts::{AccountPortfolioValue, AccountValue};
 #[cfg(feature = "ibkr")]
@@ -55,7 +57,6 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 pub mod core;
-pub mod dataframe;
 pub mod interface;
 pub mod network;
 pub mod serialization;
@@ -63,4 +64,4 @@ pub mod trading;
 #[cfg(feature = "strategies")]
 pub mod strategies;
 
-pub use dataframe::DataFrame;
+pub use core::DataFrame;

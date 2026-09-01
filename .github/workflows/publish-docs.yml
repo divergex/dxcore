@@ -1,0 +1,71 @@
+# Builds rustdoc and publishes it to GitHub Pages.
+#
+# Served at https://divergex.github.io/dxcore/. The Divergex site
+# (divergex.org, a Next.js app in the `divergex` repo) embeds these pages
+# at /docs/dxcore with an iframe, same as it does for dxlib.
+#
+# Uses the native Pages deployment API (upload-pages-artifact +
+# deploy-pages), so Pages must be enabled on this repo with "GitHub
+# Actions" as the source.
+
+name: Publish Docs to Pages
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags needed for the version stamp
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Stamp version from latest tag
+        run: |
+          tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          if [[ -z "$tag" ]]; then
+            tag="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+          fi
+          echo "RUSTDOCFLAGS=--crate-version $tag" >> "$GITHUB_ENV"
+
+      - name: Build rustdoc
+        run: cargo doc --no-deps --workspace
+
+      # rustdoc does not emit a root index.html
+      - name: Add root redirect page
+        run: cp docs/redirect.html target/doc/index.html
+
+      - name: Upload pages artifact
+        if: ${{ !env.ACT }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        if: ${{ !env.ACT }}
+        id: deployment
+        uses: actions/deploy-pages@v4

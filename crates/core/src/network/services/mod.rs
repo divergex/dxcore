@@ -72,7 +72,7 @@ pub trait Service: Send + Sync {
 ///
 /// `A` is the typed value; the service serializes/deserializes it to the
 /// wire format, so the accessors work in `A`, never in JSON. For attributes
-/// that are real fields of `T`, use the [`attribute!`] macro instead of
+/// that are real fields of `T`, use the [`crate::attribute!`] macro instead of
 /// writing these by hand.
 pub struct Attribute<T, A> {
     getter: Option<Arc<dyn Fn(&T) -> Result<A, ServiceError> + Send + Sync>>,
