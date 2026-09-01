@@ -1,0 +1,29 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "dxcore"
+version = "0.1.0"
+description = "Backbone for data processing, networking and core structures for dx libraries."
+requires-python = ">=3.9"
+license = "MIT"
+dependencies = [
+    "polars>=1.0",
+]
+authors = [{ name = "Rafael Zimmer", email = "rzimmerdev@gmail.com" }]
+readme = "README.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.maturin]
+manifest-path = "crates/pybindings/Cargo.toml"
+module-name = "dxcore"
+bindings = "pyo3"
+features = ["extension-module", "ibkr"]
+
+[tool.pytest.ini_options]
+testpaths = ["crates/pybindings/tests"]

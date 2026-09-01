@@ -436,7 +436,11 @@ dependencies = [
 name = "dxcore-pyo3"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
  "dxcore",
+ "futures",
+ "ibapi",
+ "polars",
  "pyo3",
 ]
 

@@ -11,7 +11,23 @@ crate-type = ["cdylib", "rlib"]
 dxcore = { path = "../core" }
 pyo3 = { version = "0.29", features = ["abi3-py39"] }
 
+# DataFrames cross the FFI boundary as Arrow IPC; polars must agree with the
+# core crate's version so `DataFrame` is the same type on both sides.
+polars = { version = "0.46", features = ["ipc"] }
+
+# Stream trait + StreamExt for the async executor bridge.
+futures = { version = "0.3", default-features = false, features = ["std"] }
+
+# Async executor output channel: `Receiver` is Send + Sync, unlike std's.
+crossbeam-channel = "0.5"
+
+# Only needed when binding the IBKR interface (feature `ibkr`).
+ibapi = { version = "3", optional = true, default-features = false, features = [
+  "sync",
+] }
+
+[features]
 # maturin enables this when building the wheel; keeping it off by default
 # lets `cargo test` link the crate without a host Python embedding.
-[features]
 extension-module = ["pyo3/extension-module"]
+ibkr = ["dxcore/ibkr", "dep:ibapi"]
