@@ -1,6 +1,45 @@
-use polars::prelude::*;
+#![allow(dead_code)]
 
-use dxcore::trading::DailyView;
+use std::sync::Arc;
+
+use polars::prelude::*;
+use serde::Serialize;
+
+use dxcore::interface::internal::StepArgs;
+use dxcore::network::servers::{HttpServer, ServerHandle};
+use dxcore::network::services::{FunctionalService, ServiceError};
+use dxcore::trading::{DailyView, Strategy};
+
+struct Runner<S: Strategy> {
+    strategy: S,
+    state: S::State,
+}
+
+pub fn serve<S>(strategy: S) -> Result<(String, ServerHandle), ServiceError>
+where
+    S: Strategy<Input = (i32, DataFrame)> + Send + Sync + 'static,
+    S::State: Send + Sync + 'static,
+    S::Output: Serialize + Send + Sync + 'static,
+{
+    let runner = Runner {
+        strategy,
+        state: S::State::default(),
+    };
+    let service = FunctionalService::new("strategy", runner).with_set(
+        "on_step",
+        |runner: &mut Runner<S>, args: StepArgs| {
+            let (step, history) = args.into_parts();
+            Ok(runner
+                .strategy
+                .on_step(&step, &history, &mut runner.state))
+        },
+    );
+
+    let server = HttpServer::bind("127.0.0.1:0", Arc::new(service))?;
+    let addr = server.addr();
+    let handle = server.spawn();
+    Ok((format!("http://{addr}"), handle))
+}
 
 pub fn generate_ohlc(n_days: usize) -> DataFrame {
     let prices: Vec<f64> = (0..n_days)

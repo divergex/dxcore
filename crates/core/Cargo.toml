@@ -42,6 +42,11 @@ path = "examples/interface.rs"
 required-features = ["strategies"]
 
 [[example]]
+name = "remote_strategy"
+path = "examples/remote_strategy.rs"
+required-features = ["strategies"]
+
+[[example]]
 name = "xbrl_poll"
 path = "examples/xbrl_poll.rs"
 
