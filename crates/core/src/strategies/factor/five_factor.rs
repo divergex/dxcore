@@ -2,21 +2,12 @@ use std::collections::HashMap;
 
 use polars::prelude::*;
 
-use crate::trading::strategy::StreamedStrategy;
+use crate::trading::{Signal, StreamedStrategy};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Source {
     Fundamentals,
     Returns,
-}
-
-#[derive(Debug, Clone)]
-pub struct Signal {
-    pub date: i32,
-    pub symbol: String,
-    pub action: String,
-    pub weight: f64,
-    pub price: f64,
 }
 
 /// Raw accounting data from the most recent fundamentals filing.
@@ -82,63 +73,23 @@ impl StreamedStrategy for FiveFactor {
     type Key = Source;
     type Input = (i32, DataFrame);
     type State = State;
-    type Output = Signal;
-    type Frame = DataFrame;
+    type Output = Option<Signal>;
 
     fn on_step(
         &self,
-        (date, df): &(i32, DataFrame),
+        (_date, df): &(i32, DataFrame),
         key: &Source,
         _history: &HashMap<Source, DataFrame>,
         state: &mut State,
-    ) -> Signal {
+    ) -> Option<Signal> {
         state.top_n = self.top_n;
 
         match key {
             Source::Fundamentals => {
                 self.ingest_fundamentals(df, state);
-                Signal {
-                    date: *date,
-                    symbol: String::new(),
-                    action: "-".into(),
-                    weight: 0.0,
-                    price: 0.0,
-                }
+                None
             }
-            Source::Returns => self.handle_returns(*date, df, state),
-        }
-    }
-
-    fn create_output(&self) -> DataFrame {
-        DataFrame::new(vec![
-            Column::new_empty("date".into(), &DataType::Int32),
-            Column::new_empty("symbol".into(), &DataType::String),
-            Column::new_empty("action".into(), &DataType::String),
-            Column::new_empty("weight".into(), &DataType::Float64),
-            Column::new_empty("price".into(), &DataType::Float64),
-        ])
-        .unwrap()
-    }
-
-    fn append_output(
-        &self,
-        frame: &mut DataFrame,
-        output: Signal,
-        _step: &(i32, DataFrame),
-    ) {
-        let row = DataFrame::new(vec![
-            Column::new("date".into(), &[output.date]),
-            Column::new("symbol".into(), &[output.symbol.as_str()]),
-            Column::new("action".into(), &[output.action.as_str()]),
-            Column::new("weight".into(), &[output.weight]),
-            Column::new("price".into(), &[output.price]),
-        ])
-        .unwrap();
-
-        if frame.height() == 0 {
-            *frame = row;
-        } else {
-            frame.vstack_mut(&row).unwrap();
+            Source::Returns => self.handle_returns(df, state),
         }
     }
 }
@@ -177,7 +128,7 @@ impl FiveFactor {
         }
     }
 
-    fn handle_returns(&self, date: i32, df: &DataFrame, state: &mut State) -> Signal {
+    fn handle_returns(&self, df: &DataFrame, state: &mut State) -> Option<Signal> {
         let symbols = df
             .column(&self.symbol_col)
             .map(|c| c.str().unwrap().clone())
@@ -227,13 +178,7 @@ impl FiveFactor {
         }
 
         if cross.len() < 2 {
-            return Signal {
-                date,
-                symbol: String::new(),
-                action: "-".into(),
-                weight: 0.0,
-                price: 0.0,
-            };
+            return None;
         }
 
         let n_f = cross.len() as f64;
@@ -313,13 +258,7 @@ impl FiveFactor {
                 let delta = target_shares - current_shares;
                 state.cash -= delta * price;
                 state.positions.insert(sym.to_string(), target_shares);
-                return Signal {
-                    date,
-                    symbol: sym.clone(),
-                    action: "BUY".into(),
-                    weight: target_value / total_value.max(1.0),
-                    price: *price,
-                };
+                return Some(Signal { symbol: Some(sym.clone()), shares: target_shares });
             }
         }
 
@@ -330,22 +269,10 @@ impl FiveFactor {
                 let delta = target_shares - current_shares;
                 state.cash -= delta * price;
                 state.positions.insert(sym.to_string(), target_shares);
-                return Signal {
-                    date,
-                    symbol: sym.clone(),
-                    action: "SELL".into(),
-                    weight: target_value / total_value.max(1.0),
-                    price: *price,
-                };
+                return Some(Signal { symbol: Some(sym.clone()), shares: target_shares });
             }
         }
 
-        Signal {
-            date,
-            symbol: String::new(),
-            action: "-".into(),
-            weight: 0.0,
-            price: 0.0,
-        }
+        None
     }
 }

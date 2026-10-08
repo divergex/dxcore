@@ -1,5 +1,3 @@
-//! Thin Python bindings over the `dxcore` core library.
-
 mod core;
 mod dataframe;
 mod interface;

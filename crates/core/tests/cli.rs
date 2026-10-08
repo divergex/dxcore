@@ -1,5 +1,3 @@
-//! The `mesh` CLI subcommand, exercised against the real binary.
-
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;

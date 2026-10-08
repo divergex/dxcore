@@ -1,11 +1,3 @@
-//! Five-factor strategy demo with live FMP fundamentals + IBKR daily returns.
-//!
-//! Prerequisites:
-//! - FMP_API_KEY environment variable
-//! - IB Gateway or TWS running on IB_HOST (default 127.0.0.1:4002)
-//!
-//! Run with: `cargo run --example five_factor --features strategies`
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,14 +5,13 @@ use std::time::Duration;
 use futures::StreamExt;
 use polars::prelude::*;
 
+use dxcore::core::Instrument;
 use dxcore::interface::external::fmp::FmpClient;
 use dxcore::interface::external::ibkr::IbkrInterface;
 use dxcore::interface::stream::poll;
-use dxcore::interface::MarketApi;
+use dxcore::interface::{MarketInterface, Span};
 use dxcore::strategies::five_factor::{FiveFactor, Source};
-use dxcore::trading::{AsyncExecutor, DailyView};
-use ibapi::contracts::Contract;
-use ibapi::market_data::historical::{BarSize, ToDuration};
+use dxcore::trading::{AsyncExecutor, BaseOrderEngine, DailyView};
 
 const SYMBOLS: &[&str] = &["AAPL", "MSFT", "GOOGL"];
 const INITIAL_CASH: f64 = 100_000.0;
@@ -33,7 +24,7 @@ async fn main() {
     let ibkr = Arc::new(IbkrInterface::new(ib_host, 1));
 
     let strategy = FiveFactor::new(INITIAL_CASH, TOP_N);
-    let mut executor = AsyncExecutor::new(strategy);
+    let mut executor = AsyncExecutor::new(BaseOrderEngine::new(), strategy);
 
 
     let fundamentals = {
@@ -82,13 +73,16 @@ async fn main() {
     println!("initial cash: ${INITIAL_CASH}");
     println!("top N: {TOP_N}\n");
 
-    while let Some(row) = output.next().await {
-        let s = &row.output;
-        if s.action != "-" {
-            println!(
-                "date={} symbol={} action={} weight={:.4} price={:.2}",
-                s.date, s.symbol, s.action, s.weight, s.price
-            );
+    while let Some(order) = output.next().await {
+        match order {
+            Ok(row) => {
+                let o = &row.output;
+                println!(
+                    "date={:?} symbol={} side={:?} quantity={:?} type={:?} price={:?}",
+                    o.date, o.symbol, o.side, o.quantity, o.order_type, o.price
+                );
+            }
+            Err(err) => eprintln!("order rejected: {err}"),
         }
     }
 }
@@ -179,9 +173,15 @@ fn fetch_returns(ibkr: &IbkrInterface) -> Result<(i32, DataFrame), dxcore::Error
     let mut prices: Vec<f64> = Vec::new();
 
     for &sym in SYMBOLS {
-        let contract = Contract::stock(sym).build();
+        let contract = Instrument {
+            contract_id: 0,
+            symbol: sym.into(),
+            security_type: "STK".into(),
+            exchange: "SMART".into(),
+            currency: "USD".into(),
+        };
         let df = ibkr
-            .market_history(&contract, BarSize::Day, 2.days())
+            .market_history(&contract, Span::new().days(1), Span::new().days(2))
             .map_err(|e| dxcore::Error::Connection(e.to_string()))?;
 
         if df.height() == 0 {

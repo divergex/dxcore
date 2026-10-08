@@ -1,7 +1,3 @@
-//! Polls XBRL filings every 60 seconds.
-//!
-//! Run with: `cargo run --example xbrl_poll -- AAPL MSFT`
-
 use std::collections::HashSet;
 use std::time::Duration;
 

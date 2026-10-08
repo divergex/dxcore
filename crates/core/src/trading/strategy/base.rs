@@ -3,12 +3,15 @@ use std::hash::Hash;
 
 use polars::prelude::*;
 
+/// Multi-key strategy: one step stream per [`StrategyBase::Key`].
+///
+/// Like [`Strategy`](super::Strategy), the output is the strategy's only
+/// decision; executors hand it to an [`OrderEngine`](crate::trading::OrderEngine).
 pub trait StrategyBase {
     type Key: Eq + Hash + Clone;
     type Input;
     type State: Default;
-    type Output: Clone;
-    type Frame;
+    type Output;
 
     fn on_step(
         &self,
@@ -17,8 +20,4 @@ pub trait StrategyBase {
         history: &HashMap<Self::Key, DataFrame>,
         state: &mut Self::State,
     ) -> Self::Output;
-
-    fn create_output(&self) -> Self::Frame;
-
-    fn append_output(&self, frame: &mut Self::Frame, output: Self::Output, step: &Self::Input);
 }

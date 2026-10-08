@@ -1,5 +1,3 @@
-//! Bindings for `dxcore::network::mesh`: the service mesh and registry types.
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -17,13 +15,13 @@ pub enum PyProtocol {
 }
 
 impl PyProtocol {
-    fn to_core(self) -> Protocol {
+    pub(crate) fn to_core(self) -> Protocol {
         match self {
             PyProtocol::Http => Protocol::Http,
         }
     }
 
-    fn from_core(protocol: Protocol) -> Self {
+    pub(crate) fn from_core(protocol: Protocol) -> Self {
         match protocol {
             Protocol::Http => PyProtocol::Http,
         }

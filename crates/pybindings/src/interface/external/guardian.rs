@@ -1,5 +1,3 @@
-//! Guardian Content API bindings.
-
 use pyo3::prelude::*;
 
 use ::dxcore::interface::external::guardian::{

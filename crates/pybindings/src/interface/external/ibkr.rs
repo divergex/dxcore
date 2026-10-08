@@ -1,15 +1,12 @@
-//! Interactive Brokers (TWS/Gateway) bindings.
-
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use crate::core::PyPortfolio;
 use crate::dataframe;
 
+use ::dxcore::core::Instrument;
 use ::dxcore::interface::external::ibkr::IbkrInterface;
-use ::dxcore::interface::MarketApi;
-
-use ibapi::contracts::{Contract, ContractBuilder, SecurityType};
+use ::dxcore::interface::{AccountInterface, MarketInterface, Span};
 
 use super::to_py_err;
 
@@ -78,33 +75,14 @@ impl PyContract {
 }
 
 impl PyContract {
-    fn to_ibapi(&self) -> Result<Contract, PyErr> {
-        let security_type = match self.security_type.to_ascii_uppercase().as_str() {
-            "STK" => SecurityType::Stock,
-            "OPT" => SecurityType::Option,
-            "FUT" => SecurityType::Future,
-            "CONTFUT" => SecurityType::ContinuousFuture,
-            "IND" => SecurityType::Index,
-            "FOP" => SecurityType::FuturesOption,
-            "CASH" => SecurityType::ForexPair,
-            "COMBO" => SecurityType::Spread,
-            "WAR" => SecurityType::Warrant,
-            "BOND" => SecurityType::Bond,
-            "CMDTY" => SecurityType::Commodity,
-            other => {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "unknown security type: {other}"
-                )))
-            }
-        };
-        ContractBuilder::new()
-            .contract_id(self.contract_id)
-            .symbol(&self.symbol)
-            .security_type(security_type)
-            .exchange(&self.exchange)
-            .currency(&self.currency)
-            .build()
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    fn to_instrument(&self) -> Instrument {
+        Instrument {
+            contract_id: self.contract_id,
+            symbol: self.symbol.clone(),
+            security_type: self.security_type.clone(),
+            exchange: self.exchange.clone(),
+            currency: self.currency.clone(),
+        }
     }
 }
 
@@ -125,19 +103,19 @@ impl PyIbkrInterface {
     /// Fetch historical bars for `contract` as a DataFrame with columns
     /// `date`, `open`, `high`, `low`, `close`, `volume`.
     ///
-    /// `bar_size` and `duration` accept the same strings as IB's API,
-    /// e.g. `"1 day"` and `"30 D"`.
+    /// `bar_size` and `duration` accept spans in jiff's friendly format,
+    /// e.g. `"1 day"` and `"30 days"`.
     fn market_history(
         &self,
         contract: &PyContract,
         bar_size: &str,
         duration: &str,
     ) -> PyResult<Py<PyAny>> {
-        let contract = contract.to_ibapi()?;
-        let bar_size = bar_size
+        let contract = contract.to_instrument();
+        let bar_size: Span = bar_size
             .parse()
             .map_err(|e| PyValueError::new_err(format!("bad bar_size: {e}")))?;
-        let duration = duration
+        let duration: Span = duration
             .parse()
             .map_err(|e| PyValueError::new_err(format!("bad duration: {e}")))?;
         let df = self

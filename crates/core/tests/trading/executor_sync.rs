@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use polars::prelude::*;
 use dxcore::trading::{
-    DailyView, Strategy, StreamedStrategy, SyncExecutor, TickView,
+    DailyView, OrderEngine, OrderError, Strategy, StreamedStrategy, SyncExecutor, TickView,
 };
 
 use super::helpers;
@@ -13,48 +13,66 @@ impl Strategy for CountStrategy {
     type Input = DataFrame;
     type State = u32;
     type Output = u32;
-    type Frame = Vec<u32>;
 
     fn on_step(&self, _step: &DataFrame, _history: &DataFrame, state: &mut u32) -> u32 {
         *state += 1;
         *state
+    }
+}
+
+/// Smallest possible engine: every output becomes one order, verbatim.
+struct PassThrough;
+
+impl<I> OrderEngine<u32, I> for PassThrough {
+    type Order = u32;
+    type Frame = Vec<u32>;
+    type State = ();
+
+    fn transform(
+        &self,
+        output: u32,
+        _step: &I,
+        _date: Option<i64>,
+        _state: &mut (),
+    ) -> Result<Option<u32>, OrderError> {
+        Ok(Some(output))
     }
 
     fn create_output(&self) -> Vec<u32> {
         Vec::new()
     }
 
-    fn append_output(&self, frame: &mut Vec<u32>, output: u32, _step: &DataFrame) {
-        frame.push(output);
+    fn append_output(&self, frame: &mut Vec<u32>, order: u32, _step: &I) {
+        frame.push(order);
     }
 }
 
 #[test]
 fn returns_frame() {
     let df = helpers::ohlc_df();
-    let mut executor = SyncExecutor::new(CountStrategy);
-    let frame = executor.run(&df, TickView::new("date"));
+    let mut executor = SyncExecutor::new(PassThrough, CountStrategy);
+    let frame = executor.run(&df, TickView::new("date")).unwrap();
     assert_eq!(frame, vec![1, 2, 3, 4, 5]);
 }
 
 #[test]
 fn empty_df_yields_empty_frame() {
     let df = helpers::empty_ohlc_df();
-    let mut executor = SyncExecutor::new(CountStrategy);
-    let frame = executor.run(&df, TickView::new("date"));
+    let mut executor = SyncExecutor::new(PassThrough, CountStrategy);
+    let frame = executor.run(&df, TickView::new("date")).unwrap();
     assert!(frame.is_empty());
 }
 
 #[test]
 fn reusable_across_datasets() {
     let df1 = helpers::ohlc_df();
-    let mut executor = SyncExecutor::new(CountStrategy);
+    let mut executor = SyncExecutor::new(PassThrough, CountStrategy);
 
-    let frame1 = executor.run(&df1, TickView::new("date"));
+    let frame1 = executor.run(&df1, TickView::new("date")).unwrap();
     assert_eq!(frame1.len(), 5);
 
     let df2 = helpers::empty_ohlc_df();
-    let frame2 = executor.run(&df2, TickView::new("date"));
+    let frame2 = executor.run(&df2, TickView::new("date")).unwrap();
     assert!(frame2.is_empty());
 }
 
@@ -71,7 +89,6 @@ impl StreamedStrategy for MultiCountStrategy {
     type Input = DataFrame;
     type State = u32;
     type Output = u32;
-    type Frame = Vec<(Symbol, u32)>;
 
     fn on_step(
         &self,
@@ -82,19 +99,6 @@ impl StreamedStrategy for MultiCountStrategy {
     ) -> u32 {
         *state += 1;
         *state
-    }
-
-    fn create_output(&self) -> Vec<(Symbol, u32)> {
-        Vec::new()
-    }
-
-    fn append_output(
-        &self,
-        frame: &mut Vec<(Symbol, u32)>,
-        output: u32,
-        _step: &DataFrame,
-    ) {
-        frame.push((Symbol::Aapl, output));
     }
 }
 
@@ -126,10 +130,14 @@ fn run_multi_processes_all_keys() {
         (Symbol::Goog, TickView::new("date")),
     ]);
 
-    let mut executor = SyncExecutor::new(MultiCountStrategy);
-    executor.run_multi(&dfs, views);
+    let mut executor = SyncExecutor::new(PassThrough, MultiCountStrategy);
+    let frame = executor.run_multi(&dfs, views).unwrap();
 
-    // 3 AAPL rows + 2 GOOG rows = 5 steps; no panic = success.
+    // 3 AAPL rows + 2 GOOG rows = 5 steps. TickView defines no ordering, so
+    // which key goes first depends on map iteration: compare as a multiset.
+    let mut sorted = frame.clone();
+    sorted.sort();
+    assert_eq!(sorted, vec![1, 2, 3, 4, 5]);
 }
 
 #[test]
@@ -168,7 +176,6 @@ fn run_multi_interleaves_by_timestamp() {
         type Input = (i32, DataFrame);
         type State = ();
         type Output = (Key, i32);
-        type Frame = Vec<(Key, i32)>;
 
         fn on_step(
             &self,
@@ -179,6 +186,25 @@ fn run_multi_interleaves_by_timestamp() {
         ) -> (Key, i32) {
             (key.clone(), step.0)
         }
+    }
+
+    /// The output already carries the key, so the engine just passes it on.
+    struct TaggedOrders;
+
+    impl OrderEngine<(Key, i32), (i32, DataFrame)> for TaggedOrders {
+        type Order = (Key, i32);
+        type Frame = Vec<(Key, i32)>;
+        type State = ();
+
+        fn transform(
+            &self,
+            output: (Key, i32),
+            _step: &(i32, DataFrame),
+            _date: Option<i64>,
+            _state: &mut (),
+        ) -> Result<Option<(Key, i32)>, OrderError> {
+            Ok(Some(output))
+        }
 
         fn create_output(&self) -> Vec<(Key, i32)> {
             Vec::new()
@@ -187,10 +213,10 @@ fn run_multi_interleaves_by_timestamp() {
         fn append_output(
             &self,
             frame: &mut Vec<(Key, i32)>,
-            output: (Key, i32),
+            order: (Key, i32),
             _step: &(i32, DataFrame),
         ) {
-            frame.push(output);
+            frame.push(order);
         }
     }
 
@@ -203,8 +229,8 @@ fn run_multi_interleaves_by_timestamp() {
         (Key::B, DailyView::new("date")),
     ]);
 
-    let mut executor = SyncExecutor::new(OrderRecorder);
-    let frame = executor.run_multi(&dfs, views);
+    let mut executor = SyncExecutor::new(TaggedOrders, OrderRecorder);
+    let frame = executor.run_multi(&dfs, views).unwrap();
 
     // Steps must be sorted by timestamp; equal timestamps retain insertion order.
     let dates: Vec<i32> = frame.iter().map(|(_, d)| *d).collect();

@@ -1,27 +1,14 @@
-//! Serves a data source over HTTP through the network service layer.
-//!
-//! Run with: `cargo run --example serve_data_source -- [port]`
-//!
-//! Each data-source query is registered on an [`AttributeService`] as an
-//! immutable method: the argument arrives as JSON in the request body, is
-//! deserialized with `from_value`, and the return value is serialized back
-//! with `to_value`. Mutable methods are registered with `with_set` instead.
-//!
-//! - `curl -X GET http://127.0.0.1:8080/profile -d '"AAPL"'`
-//! - `curl -X GET http://127.0.0.1:8080/balance_sheet -d '"AAPL"'`
-//! - `curl -X GET http://127.0.0.1:8080/income_statement -d '"AAPL"'`
-
 use std::sync::Arc;
 
 use dxcore::interface::external::fmp::FmpClient;
 use dxcore::network::servers::HttpServer;
-use dxcore::network::services::{AttributeService, ServiceError};
+use dxcore::network::services::{ClassService, ServiceError};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenvy::dotenv();
     let port = std::env::args().nth(1).unwrap_or_else(|| "8080".into());
 
-    let service = AttributeService::new("fmp", FmpClient::from_env()?)
+    let service = ClassService::new("fmp", FmpClient::from_env()?)
         .with_get("profile", |c: &FmpClient, symbol: String| {
             c.profile(&symbol).map_err(|e| ServiceError::Internal(e.to_string()))
         })

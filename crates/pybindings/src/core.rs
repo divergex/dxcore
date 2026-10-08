@@ -1,6 +1,3 @@
-//! Bindings for the `dxcore::core` data model: instruments, accounts,
-//! portfolios and the instrument store.
-
 use ::dxcore::core::{AccountMetric, Instrument, InstrumentStore, Portfolio};
 use pyo3::prelude::*;
 

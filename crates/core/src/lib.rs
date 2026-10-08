@@ -1,4 +1,3 @@
-
 #![doc = include_str!("../../../docs/guides/getting-started.md")]
 
 #[cfg(feature = "ibkr")]
@@ -8,8 +7,9 @@ pub use ibapi::contracts::Contract;
 #[cfg(feature = "ibkr")]
 pub use ibapi::market_data::historical::{Bar, BarTimestamp};
 
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
     /// Connection to TWS/Gateway established.
     Connected,
@@ -42,6 +42,7 @@ pub enum Error {
     Connection(String),
     Subscription(String),
     Http(String),
+    Interface(String),
 }
 
 impl std::fmt::Display for Error {
@@ -50,6 +51,7 @@ impl std::fmt::Display for Error {
             Error::Connection(msg) => write!(f, "connection error: {msg}"),
             Error::Subscription(msg) => write!(f, "subscription error: {msg}"),
             Error::Http(msg) => write!(f, "http error: {msg}"),
+            Error::Interface(msg) => write!(f, "interface error: {msg}"),
         }
     }
 }

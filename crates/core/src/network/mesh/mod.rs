@@ -1,9 +1,3 @@
-//! - `GET /health`
-//! - `GET /discover?protocol=<name>` registered services
-//! - `GET /services/{uuid}/endpoints?protocol=<name>` endpoint names
-//! - `GET /services/{uuid}/endpoints/{name}?protocol=<name>` endpoint record
-//! - `POST /services`  register a service (body: [`Registration`])
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -13,7 +7,7 @@ use uuid::Uuid;
 
 use crate::network::services::{Request, Response, Service, ServiceError};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Protocol {
     Http,
 }

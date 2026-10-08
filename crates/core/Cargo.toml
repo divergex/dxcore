@@ -15,6 +15,7 @@ ibkr = ["dep:ibapi"]
 ibapi = { version = "3", optional = true, features = [
   "sync",
 ], default-features = false }
+jiff = { version = "0.2", default-features = false, features = ["std", "serde"] }
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 dotenvy = "0.15"
 polars = { version = "0.46", features = ["dtype-date", "strings", "json"] }
@@ -36,6 +37,11 @@ path = "examples/strategy.rs"
 required-features = ["strategies"]
 
 [[example]]
+name = "interface"
+path = "examples/interface.rs"
+required-features = ["strategies"]
+
+[[example]]
 name = "xbrl_poll"
 path = "examples/xbrl_poll.rs"
 
@@ -43,6 +49,11 @@ path = "examples/xbrl_poll.rs"
 name = "five_factor"
 path = "examples/five_factor.rs"
 required-features = ["strategies", "ibkr"]
+
+[[example]]
+name = "serve_ibkr"
+path = "examples/serve_ibkr.rs"
+required-features = ["ibkr"]
 
 [[example]]
 name = "serve_portfolio"

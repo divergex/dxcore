@@ -1,5 +1,3 @@
-//! XBRL filings bindings.
-
 use pyo3::prelude::*;
 
 use ::dxcore::interface::external::xbrl::{query_filings, XbrlFiling};

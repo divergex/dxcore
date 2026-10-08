@@ -1,11 +1,18 @@
-#![cfg(feature = "ibkr")]
-
 use polars::prelude::*;
 
 use dxcore::core::{Instrument, Portfolio};
-use dxcore::interface::MockInterface;
-use dxcore::interface::MarketApi;
+use dxcore::interface::{AccountInterface, MarketInterface, MockInterface, Span};
 use dxcore::{Error, Event};
+
+fn dummy_instrument() -> Instrument {
+    Instrument {
+        contract_id: 0,
+        symbol: String::new(),
+        security_type: String::new(),
+        exchange: String::new(),
+        currency: String::new(),
+    }
+}
 
 fn make_history_df() -> DataFrame {
     DataFrame::new(vec![
@@ -42,9 +49,9 @@ fn mock_market_history_returns_configured_df() {
 
     let result = mock
         .market_history(
-            &ibapi::contracts::Contract::default(),
-            ibapi::market_data::historical::BarSize::Day,
-            ibapi::market_data::historical::Duration::days(5),
+            &dummy_instrument(),
+            Span::new().days(1),
+            Span::new().days(5),
         )
         .unwrap();
 
@@ -69,9 +76,9 @@ fn mock_market_history_returns_configured_df() {
 fn mock_market_history_errors_when_no_history_configured() {
     let mock = MockInterface::new();
     let result = mock.market_history(
-        &ibapi::contracts::Contract::default(),
-        ibapi::market_data::historical::BarSize::Day,
-        ibapi::market_data::historical::Duration::days(5),
+        &dummy_instrument(),
+        Span::new().days(1),
+        Span::new().days(5),
     );
     assert!(result.is_err());
 }
@@ -97,54 +104,37 @@ fn mock_portfolio_errors_when_no_portfolio_configured() {
 }
 
 #[test]
-fn mock_listen_sends_configured_events() {
-    use std::sync::mpsc;
-
-    let events = vec![
+fn mock_events_returns_configured() {
+    let mock = MockInterface::new().with_events(vec![
         Event::Connected,
         Event::UpdateTime("12:00:00".into()),
         Event::Disconnected("done".into()),
-    ];
-    let count = events.len();
-    let mock = MockInterface::new().with_events(events);
+    ]);
 
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        mock.listen("U123", tx).unwrap();
-    });
+    let events = mock.events("U123").unwrap();
 
-    let received: Vec<Event> = rx.iter().collect();
-    assert_eq!(received.len(), count);
-    assert!(matches!(received[0], Event::Connected));
-    assert!(matches!(received[2], Event::Disconnected(_)));
+    assert_eq!(events.len(), 3);
+    assert!(matches!(events[0], Event::Connected));
+    assert!(matches!(events[1], Event::UpdateTime(_)));
+    assert!(matches!(events[2], Event::Disconnected(_)));
 }
 
 #[test]
-fn mock_listen_empty_events_sends_nothing() {
-    use std::sync::mpsc;
+fn mock_listen_async_starts_the_loop() {
+    let mock = MockInterface::new();
 
-    let mock = MockInterface::new().with_events(vec![]);
+    mock.listen_async("U123").unwrap();
 
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        mock.listen("U123", tx).unwrap();
-    });
-
-    // Channel closes immediately — no events sent.
-    let received: Vec<Event> = rx.iter().collect();
-    assert!(received.is_empty());
+    assert!(mock.events("U123").unwrap().is_empty());
 }
 
-
-#[cfg(feature = "integration")]
+#[cfg(all(feature = "integration", feature = "ibkr"))]
 mod integration {
     use std::env;
-    use std::sync::mpsc;
 
-    use ibapi::contracts::Contract;
-
+    use dxcore::core::Instrument;
     use dxcore::interface::external::ibkr::IbkrInterface;
-    use dxcore::interface::MarketApi;
+    use dxcore::interface::{AccountInterface, MarketInterface, Span};
     use dxcore::Event;
 
     fn account_id() -> String {
@@ -156,13 +146,15 @@ mod integration {
     fn ibkr_market_history_returns_dataframe() {
         let interface = IbkrInterface::new("127.0.0.1:7496".into(), 1);
 
-        let contract = Contract::stock("AAPL").build();
+        let contract = Instrument {
+            contract_id: 0,
+            symbol: "AAPL".into(),
+            security_type: "STK".into(),
+            exchange: "SMART".into(),
+            currency: "USD".into(),
+        };
         let df = interface
-            .market_history(
-                &contract,
-                ibapi::market_data::historical::BarSize::Day,
-                ibapi::market_data::historical::Duration::days(5),
-            )
+            .market_history(&contract, Span::new().days(1), Span::new().days(5))
             .expect("market_history failed");
 
         assert!(df.height() > 0, "expected at least one bar");
@@ -180,41 +172,32 @@ mod integration {
         let account = account_id();
 
         let _portfolio = interface.portfolio(&account).expect("portfolio failed");
-
     }
 
     /// Requires a running TWS/Gateway with the test account.
     #[test]
-    fn ibkr_listen_streams_events() {
-
+    fn ibkr_listen_async_records_events() {
         let interface = IbkrInterface::new("127.0.0.1:7496".into(), 1);
         let account = account_id();
 
-        let (tx, rx) = mpsc::channel();
-        let handle = std::thread::spawn(move || {
-            interface.listen(&account, tx)
-        });
+        interface
+            .listen_async(&account)
+            .expect("listen_async failed");
 
-        // Collect events with a timeout — we just want to verify the stream
-        // starts and sends a Connected event, not drain the full session.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
         let mut connected = false;
         let mut saw_position_or_value = false;
 
-        for event in rx.iter().take(50) {
-            match event {
-                Event::Connected => connected = true,
-                Event::AccountValue(_) | Event::Position(_) => {
-                    saw_position_or_value = true;
+        while std::time::Instant::now() < deadline && !saw_position_or_value {
+            for event in interface.events(&account).expect("events failed") {
+                match event {
+                    Event::Connected => connected = true,
+                    Event::AccountValue(_) | Event::Position(_) => saw_position_or_value = true,
+                    _ => {}
                 }
-                Event::HistoricalBars { .. } | Event::HistoricalError { .. } => {
-                    break; // history fetched, done
-                }
-                Event::Disconnected(_) => break,
-                _ => {}
             }
+            std::thread::sleep(std::time::Duration::from_millis(200));
         }
-
-        handle.join().ok();
 
         assert!(connected, "did not receive Connected event");
         assert!(

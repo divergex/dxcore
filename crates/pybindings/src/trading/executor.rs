@@ -1,37 +1,3 @@
-//! Bindings for the trading executor: run a Python strategy over a
-//! `polars.DataFrame` (backtest) or over a stream of daily steps (live).
-//!
-//! # Python strategy protocol
-//!
-//! A strategy is any object implementing three methods:
-//!
-//! ```python
-//! class MyStrategy:
-//!     def create_output(self) -> pl.DataFrame:
-//!         """Fresh (possibly empty) output frame the executor accumulates into."""
-//!         ...
-//!
-//!     def on_step(self, date: int, step: pl.DataFrame,
-//!                 history: pl.DataFrame, state: dict) -> Any:
-//!         """One daily step, in date order.
-//!
-//!         `step` is that day's rows (column map applied), `history` is every
-//!         prior day appended so far, `state` is a fresh dict per run.
-//!         """
-//!         ...
-//!
-//!     def append_output(self, frame: pl.DataFrame, output: Any,
-//!                       date: int, step: pl.DataFrame) -> pl.DataFrame | None:
-//!         """Accumulate `output` into `frame`.
-//!
-//!         Return the new frame, or mutate `frame` in place and return None.
-//!         """
-//!         ...
-//! ```
-//!
-//! If any method raises, the run aborts and the original exception is
-//! re-raised on the caller's thread.
-
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
@@ -45,75 +11,131 @@ use pyo3::types::PyTuple;
 use ::dxcore::trading::{AsyncExecutor, SyncExecutor};
 
 use crate::dataframe;
+use crate::trading::engine::PyBaseOrderEngine;
+use crate::trading::lock;
+use crate::trading::orders::PyOrder;
 use crate::trading::strategy::PyStrategy;
 use crate::trading::view::PyDailyView;
 
+fn take_pending(slot: &Arc<Mutex<Option<PyErr>>>) -> Option<PyErr> {
+    lock(slot).take()
+}
+
 #[pyclass(name = "Executor", module = "dxcore")]
 pub struct PyExecutor {
+    engine: Py<PyBaseOrderEngine>,
     strategy: Py<PyAny>,
 }
 
 #[pymethods]
 impl PyExecutor {
     #[new]
-    #[pyo3(signature = (strategy))]
-    fn new(strategy: Py<PyAny>) -> Self {
-        Self { strategy }
+    #[pyo3(signature = (engine, strategy))]
+    fn new(engine: Py<PyBaseOrderEngine>, strategy: Py<PyAny>) -> Self {
+        Self { engine, strategy }
     }
 
-    fn run(&mut self, df: Bound<'_, PyAny>, view: &PyDailyView) -> PyResult<Py<PyAny>> {
+    fn run(&self, df: Bound<'_, PyAny>, view: &PyDailyView) -> PyResult<Vec<PyOrder>> {
         let py = df.py();
         let df = dataframe::df_from_py(&df)?;
-        let adapter = PyStrategy::new(self.strategy.clone_ref(py));
-        let mut executor = SyncExecutor::new(adapter);
+        let engine = {
+            let engine = self.engine.bind(py).borrow();
+            engine.clear_pending();
+            engine.clone_for_run()
+        };
+        let strategy = PyStrategy::new(self.strategy.clone_ref(py));
+        let mut executor = SyncExecutor::new(engine, strategy);
         let frame = executor.run(&df, view.to_core());
-        match executor.strategy.take_pending() {
-            Some(err) => Err(err),
-            None => Ok(frame),
+
+        // A stashed Python error (a bogus strategy output, or an exception from
+        // `on_step`) wins over `Ok`/`Err` from the run.
+        if let Some(err) = executor.engine.take_pending() {
+            return Err(err);
+        }
+        if let Some(err) = executor.strategy.take_pending() {
+            return Err(err);
+        }
+
+        match frame {
+            Ok(orders) => Ok(orders.into_iter().map(PyOrder::from_core).collect()),
+            Err(err) => Err(PyValueError::new_err(err.to_string())),
         }
     }
 }
 
 #[pyclass(name = "AsyncExecutor", module = "dxcore")]
 pub struct PyAsyncExecutor {
+    engine: Py<PyBaseOrderEngine>,
     strategy: Py<PyAny>,
 }
 
 #[pymethods]
 impl PyAsyncExecutor {
     #[new]
-    #[pyo3(signature = (strategy))]
-    fn new(strategy: Py<PyAny>) -> Self {
-        Self { strategy }
+    #[pyo3(signature = (engine, strategy))]
+    fn new(engine: Py<PyBaseOrderEngine>, strategy: Py<PyAny>) -> Self {
+        Self { engine, strategy }
     }
 
-    fn run(&mut self, stream: Bound<'_, PyAny>, view: &PyDailyView) -> PyResult<PyRunIterator> {
+    fn run(&self, stream: Bound<'_, PyAny>, view: &PyDailyView) -> PyResult<PyRunIterator> {
         let py = stream.py();
         let iter = stream.try_iter()?;
-        let adapter = PyStrategy::new(self.strategy.clone_ref(py));
-        let err_slot = adapter.pending_handle();
-        let src = PyIterStream::new(iter.unbind().into_any(), err_slot.clone());
+        let engine = {
+            let engine = self.engine.bind(py).borrow();
+            engine.clear_pending();
+            engine.clone_for_run()
+        };
+        let strategy = PyStrategy::new(self.strategy.clone_ref(py));
+        let engine_pending = engine.pending_handle();
+        let strategy_pending = strategy.pending_handle();
+        let src = PyIterStream::new(iter.unbind().into_any(), Arc::clone(&strategy_pending));
         let (tx, rx) = crossbeam_channel::bounded::<Result<Py<PyAny>, PyErr>>(16);
         let view = view.to_core();
 
         std::thread::spawn(move || {
-            let mut executor = AsyncExecutor::new(adapter);
+            let mut executor = AsyncExecutor::new(engine, strategy);
             let mut stream = Box::pin(executor.run(src, view));
             let waker = Waker::noop();
             let mut cx = Context::from_waker(&waker);
             loop {
                 match stream.as_mut().poll_next(&mut cx) {
                     Poll::Ready(Some(row)) => {
-                        if let Some(err) = err_slot.lock().unwrap().take() {
+                        if let Some(err) = take_pending(&engine_pending) {
                             let _ = tx.send(Err(err));
                             break;
                         }
-                        if tx.send(Ok(row.output.into_inner())).is_err() {
-                            break; // consumer dropped the iterator
+                        if let Some(err) = take_pending(&strategy_pending) {
+                            let _ = tx.send(Err(err));
+                            break;
+                        }
+                        match row {
+                            Ok(row) => {
+                                let order = Python::attach(|py| {
+                                    Py::new(py, PyOrder::from_core(row.output))
+                                        .map(|order| order.into_any())
+                                });
+                                match order {
+                                    Ok(order) => {
+                                        if tx.send(Ok(order)).is_err() {
+                                            break; // consumer dropped the iterator
+                                        }
+                                    }
+                                    Err(err) => {
+                                        let _ = tx.send(Err(err));
+                                        break;
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                let _ = tx.send(Err(PyValueError::new_err(err.to_string())));
+                                break;
+                            }
                         }
                     }
                     Poll::Ready(None) => {
-                        if let Some(err) = err_slot.lock().unwrap().take() {
+                        if let Some(err) = take_pending(&engine_pending) {
+                            let _ = tx.send(Err(err));
+                        } else if let Some(err) = take_pending(&strategy_pending) {
                             let _ = tx.send(Err(err));
                         }
                         break;
@@ -182,14 +204,14 @@ impl Stream for PyIterStream {
                     if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) {
                         return Poll::Ready(None);
                     }
-                    *self.err.lock().unwrap() = Some(err);
+                    *lock(&self.err) = Some(err);
                     return Poll::Ready(None);
                 }
             };
             match item_to_step(&item) {
                 Ok(step) => Poll::Ready(Some(step)),
                 Err(err) => {
-                    *self.err.lock().unwrap() = Some(err);
+                    *lock(&self.err) = Some(err);
                     Poll::Ready(None)
                 }
             }

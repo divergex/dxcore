@@ -1,5 +1,3 @@
-//! End-to-end tests: services registered to servers, exercised over HTTP.
-
 use std::sync::Arc;
 
 use reqwest::blocking::Client;
@@ -8,7 +6,9 @@ use serde_json::Value;
 use dxcore::attribute;
 use dxcore::core::Portfolio;
 use dxcore::network::servers::{HttpServer, ServerHandle};
-use dxcore::network::services::{Attribute, AttributeService, Service, ServiceError};
+use dxcore::network::services::{
+    Attribute, AttributeService, ClassService, FunctionalService, Service, ServiceError,
+};
 
 /// Bind a server on an ephemeral port, spawn it, return base URL + handle.
 fn spawn_server(service: Arc<dyn Service>) -> (String, ServerHandle) {
@@ -148,7 +148,7 @@ struct Ledger {
 
 #[test]
 fn services_register_methods() {
-    let service = AttributeService::new("ledger", Ledger { balance: 100 })
+    let service = FunctionalService::new("ledger", Ledger { balance: 100 })
         .with_get("lookup", |l: &Ledger, account: String| {
             Ok(format!("{account}:{}", l.balance))
         })
@@ -212,6 +212,37 @@ fn services_register_methods() {
 
     let resp = c.get(format!("{base}/add")).send().unwrap();
     assert_eq!(resp.status(), 405);
+
+    handle.stop().unwrap();
+}
+
+#[test]
+fn class_service_composes_attributes_and_methods() {
+    let counter = Counter { value: 10 };
+    let service = ClassService::new("counter", counter)
+        .with_attribute(attribute!("value", &counter.value))
+        .with_set("add", |c: &mut Counter, amount: i64| {
+            c.value += amount;
+            Ok(c.value)
+        });
+    let (base, handle) = spawn_server(Arc::new(service));
+    let c = client();
+
+    let resp = c.get(format!("{base}/value")).send().unwrap();
+    assert_eq!(resp.text().unwrap(), "10");
+
+    let resp = c
+        .put(format!("{base}/add"))
+        .body("5")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.text().unwrap(), "15");
+
+    // A method mutation is visible to the attribute getter: one shared instance.
+    let resp = c.get(format!("{base}/value")).send().unwrap();
+    assert_eq!(resp.text().unwrap(), "15");
 
     handle.stop().unwrap();
 }

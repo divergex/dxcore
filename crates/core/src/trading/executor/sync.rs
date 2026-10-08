@@ -3,51 +3,70 @@ use std::collections::HashMap;
 use polars::prelude::*;
 
 use super::super::strategy::StrategyBase;
-use super::super::{Strategy, View};
+use super::super::{OrderEngine, OrderError, Strategy, View};
 use super::TaggedStep;
 
-pub struct SyncExecutor<S> {
+/// Runs a strategy against a frame through an [`OrderEngine`].
+pub struct SyncExecutor<E, S> {
+    pub engine: E,
     pub strategy: S,
 }
 
-impl<S> SyncExecutor<S> {
-    pub fn new(strategy: S) -> Self {
-        Self { strategy }
+impl<E, S> SyncExecutor<E, S> {
+    pub fn new(engine: E, strategy: S) -> Self {
+        Self { engine, strategy }
     }
 }
 
-impl<S: Strategy> SyncExecutor<S> {
-    pub fn run<V: View<Item = S::Input>>(
-        &mut self,
-        df: &DataFrame,
-        view: V,
-    ) -> S::Frame {
+impl<E, S: Strategy> SyncExecutor<E, S> {
+    /// Feeds `strategy` every step `view` produces, in order, and returns the
+    /// orders the engine translated. Steps the engine turns into no order leave
+    /// the frame untouched.
+    pub fn run<V>(&mut self, df: &DataFrame, view: V) -> Result<E::Frame, OrderError>
+    where
+        V: View<Item = S::Input>,
+        E: OrderEngine<S::Output, S::Input>,
+    {
         let mut history = DataFrame::empty();
         let mut state = S::State::default();
-        let mut frame = self.strategy.create_output();
+        let mut engine_state = E::State::default();
+        let mut frame = self.engine.create_output();
 
         for step in view.steps(df) {
             let output = self.strategy.on_step(&step, &history, &mut state);
-            self.strategy.append_output(&mut frame, output, &step);
+            let date = view.step_ord_key(&step);
+            let order = self
+                .engine
+                .transform(output, &step, date, &mut engine_state)?;
+            if let Some(order) = order {
+                self.engine.append_output(&mut frame, order, &step);
+            }
             view.append(&mut history, &step);
         }
 
-        frame
+        Ok(frame)
     }
 }
 
-impl<S: StrategyBase> SyncExecutor<S> {
-    pub fn run_multi<V: View<Item = S::Input>>(
+impl<E, S: StrategyBase> SyncExecutor<E, S> {
+    /// Multi-key variant of [`SyncExecutor::run`]: steps from all views are
+    /// interleaved by [`View::step_ord_key`].
+    pub fn run_multi<V>(
         &mut self,
         dfs: &HashMap<S::Key, DataFrame>,
         views: HashMap<S::Key, V>,
-    ) -> S::Frame {
+    ) -> Result<E::Frame, OrderError>
+    where
+        V: View<Item = S::Input>,
+        E: OrderEngine<S::Output, S::Input>,
+    {
         let mut history: HashMap<S::Key, DataFrame> = HashMap::new();
         for key in views.keys() {
             history.insert(key.clone(), DataFrame::empty());
         }
         let mut state = S::State::default();
-        let mut frame = self.strategy.create_output();
+        let mut engine_state = E::State::default();
+        let mut frame = self.engine.create_output();
 
         let mut tagged: Vec<TaggedStep<S::Key, S::Input>> = Vec::new();
         for (key, view) in &views {
@@ -75,12 +94,16 @@ impl<S: StrategyBase> SyncExecutor<S> {
             let output = self
                 .strategy
                 .on_step(&ts.step, &ts.key, &history, &mut state);
-            self.strategy
-                .append_output(&mut frame, output, &ts.step);
+            let order = self
+                .engine
+                .transform(output, &ts.step, ts.ord, &mut engine_state)?;
+            if let Some(order) = order {
+                self.engine.append_output(&mut frame, order, &ts.step);
+            }
             let hist_df = history.get_mut(&ts.key).unwrap();
             views[&ts.key].append(hist_df, &ts.step);
         }
 
-        frame
+        Ok(frame)
     }
 }

@@ -1,9 +1,3 @@
-//! The `mesh` subcommand: run a mesh server from the command line.
-//!
-//! `dxcore mesh start [--host <host>] [--port <port>] [--detached]` serves a
-//! fresh `MeshService`. With `--detached` it runs in the background, tracked
-//! by a pid file, and is stopped with `dxcore mesh stop`.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;

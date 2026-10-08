@@ -1,5 +1,3 @@
-//! Bindings for `dxcore::network::servers`: the HTTP server and its handle.
-
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 

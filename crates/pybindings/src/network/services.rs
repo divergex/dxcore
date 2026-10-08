@@ -1,6 +1,5 @@
-//! Bindings for `dxcore::network::services`: the `Service` trait bridge.
-
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyTypeError};
@@ -9,6 +8,8 @@ use pyo3::types::{PyDict, PyList};
 use serde_json::Value;
 
 use ::dxcore::network::services::{Request, Response, Service, ServiceError as CoreServiceError};
+
+use crate::trading::{PyOrderData, PySignal};
 
 create_exception!(dxcore, ServiceError, PyException);
 
@@ -19,6 +20,10 @@ pub(crate) fn to_py_err(err: CoreServiceError) -> PyErr {
 pub(crate) fn into_service(obj: &Bound<'_, PyAny>) -> PyResult<Arc<dyn Service>> {
     if let Ok(mesh) = obj.extract::<PyRef<super::mesh::PyMeshService>>() {
         return Ok(mesh.inner.clone());
+    }
+    if let Ok(service) = obj.extract::<PyRef<PyFunctionalService>>() {
+        let service = &*service;
+        return Ok(Arc::clone(&service.inner) as Arc<dyn Service>);
     }
     Ok(Arc::new(PyService {
         obj: obj.clone().unbind(),
@@ -60,6 +65,123 @@ impl Service for PyService {
                 .and_then(|v| v.bind(py).extract())
                 .unwrap_or_default()
         })
+    }
+}
+
+enum Endpoint {
+    Get(Py<PyAny>),
+    Set(Py<PyAny>),
+}
+
+pub(crate) struct PythonService {
+    name: String,
+    endpoints: RwLock<HashMap<String, Endpoint>>,
+}
+
+impl PythonService {
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            endpoints: RwLock::new(HashMap::new()),
+        }
+    }
+
+    fn insert(&self, method: &str, endpoint: Endpoint) {
+        self.endpoints
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(method.to_string(), endpoint);
+    }
+}
+
+impl Service for PythonService {
+    fn call(&self, request: Request) -> Result<Response, CoreServiceError> {
+        let endpoints = self
+            .endpoints
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let (handler, args) = match request {
+            Request::Get { attribute, args } => {
+                let endpoint = endpoints
+                    .get(&attribute)
+                    .ok_or_else(|| CoreServiceError::UnknownAttribute(attribute.clone()))?;
+                let Endpoint::Get(handler) = endpoint else {
+                    return Err(CoreServiceError::WriteOnly(attribute));
+                };
+                (handler, args.unwrap_or(Value::Null))
+            }
+            Request::Set { attribute, value } => {
+                let endpoint = endpoints
+                    .get(&attribute)
+                    .ok_or_else(|| CoreServiceError::UnknownAttribute(attribute.clone()))?;
+                let Endpoint::Set(handler) = endpoint else {
+                    return Err(CoreServiceError::ReadOnly(attribute));
+                };
+                (handler, value)
+            }
+            Request::Post { attribute, .. } => {
+                return Err(CoreServiceError::WriteOnly(attribute))
+            }
+        };
+
+        let value = Python::attach(|py| {
+            let args =
+                value_to_py(py, &args).map_err(|e| CoreServiceError::BadValue(e.to_string()))?;
+            let out = handler
+                .bind(py)
+                .call1((args,))
+                .map_err(|e| CoreServiceError::Internal(e.to_string()))?;
+            value_from_py(&out).map_err(|e| CoreServiceError::BadValue(e.to_string()))
+        })?;
+
+        Ok(Response { value })
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn endpoints(&self) -> Vec<String> {
+        self.endpoints
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .keys()
+            .map(|name| format!("/{name}"))
+            .collect()
+    }
+}
+
+#[pyclass(name = "FunctionalService", module = "dxcore")]
+pub struct PyFunctionalService {
+    pub(crate) inner: Arc<PythonService>,
+}
+
+#[pymethods]
+impl PyFunctionalService {
+    #[new]
+    fn new(name: &str) -> Self {
+        Self {
+            inner: Arc::new(PythonService::new(name.to_string())),
+        }
+    }
+
+    fn get(slf: Py<Self>, py: Python<'_>, method: &str, handler: Py<PyAny>) -> PyResult<Py<Self>> {
+        slf.borrow(py).inner.insert(method, Endpoint::Get(handler));
+        Ok(slf)
+    }
+
+    fn set(slf: Py<Self>, py: Python<'_>, method: &str, handler: Py<PyAny>) -> PyResult<Py<Self>> {
+        slf.borrow(py).inner.insert(method, Endpoint::Set(handler));
+        Ok(slf)
+    }
+
+    fn name(&self) -> String {
+        Service::name(self.inner.as_ref())
+    }
+
+    fn endpoints(&self) -> Vec<String> {
+        Service::endpoints(self.inner.as_ref())
     }
 }
 
@@ -112,7 +234,7 @@ fn value_to_py_opt(py: Python<'_>, value: Option<&Value>) -> PyResult<Py<PyAny>>
     }
 }
 
-fn value_to_py(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
+pub(crate) fn value_to_py(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
     Ok(match value {
         Value::Null => py.None(),
         Value::Bool(b) => (*b).into_pyobject(py)?.to_owned().into_any().unbind(),
@@ -147,7 +269,7 @@ fn value_to_py(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
     })
 }
 
-fn value_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
+pub(crate) fn value_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
     if obj.is_none() {
         return Ok(Value::Null);
     }
@@ -162,6 +284,14 @@ fn value_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
     }
     if let Ok(s) = obj.extract::<String>() {
         return Ok(Value::String(s));
+    }
+    if let Ok(signal) = obj.cast::<PySignal>() {
+        return serde_json::to_value(signal.borrow().to_core())
+            .map_err(|e| PyTypeError::new_err(e.to_string()));
+    }
+    if let Ok(data) = obj.cast::<PyOrderData>() {
+        return serde_json::to_value(data.borrow().to_core())
+            .map_err(|e| PyTypeError::new_err(e.to_string()));
     }
     if let Ok(items) = obj.extract::<Vec<Bound<'_, PyAny>>>() {
         let mut out = Vec::with_capacity(items.len());
@@ -182,5 +312,6 @@ fn value_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("ServiceError", m.py().get_type::<ServiceError>())?;
+    m.add_class::<PyFunctionalService>()?;
     Ok(())
 }

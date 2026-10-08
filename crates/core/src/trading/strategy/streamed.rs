@@ -5,12 +5,17 @@ use polars::prelude::*;
 
 use super::base::StrategyBase;
 
+/// Multi-key strategy that keeps a typed key per source stream.
+///
+/// [`StrategyBase`] is blanket-implemented for every `StreamedStrategy`, so
+/// implementing this trait is enough to run through
+/// [`SyncExecutor::run_multi`](crate::trading::SyncExecutor::run_multi) or
+/// [`AsyncExecutor::run_multi`](crate::trading::AsyncExecutor::run_multi).
 pub trait StreamedStrategy {
     type Key: Eq + Hash + Clone;
     type Input;
     type State: Default;
-    type Output: Clone;
-    type Frame;
+    type Output;
 
     fn on_step(
         &self,
@@ -19,10 +24,6 @@ pub trait StreamedStrategy {
         history: &HashMap<Self::Key, DataFrame>,
         state: &mut Self::State,
     ) -> Self::Output;
-
-    fn create_output(&self) -> Self::Frame;
-
-    fn append_output(&self, frame: &mut Self::Frame, output: Self::Output, step: &Self::Input);
 }
 
 impl<T: StreamedStrategy> StrategyBase for T {
@@ -30,7 +31,6 @@ impl<T: StreamedStrategy> StrategyBase for T {
     type Input = T::Input;
     type State = T::State;
     type Output = T::Output;
-    type Frame = T::Frame;
 
     fn on_step(
         &self,
@@ -40,18 +40,5 @@ impl<T: StreamedStrategy> StrategyBase for T {
         state: &mut Self::State,
     ) -> Self::Output {
         T::on_step(self, step, key, history, state)
-    }
-
-    fn create_output(&self) -> Self::Frame {
-        T::create_output(self)
-    }
-
-    fn append_output(
-        &self,
-        frame: &mut Self::Frame,
-        output: Self::Output,
-        step: &Self::Input,
-    ) {
-        T::append_output(self, frame, output, step)
     }
 }

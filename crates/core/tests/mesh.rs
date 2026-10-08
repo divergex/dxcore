@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use dxcore::network::mesh::{MeshService, Protocol};
 use dxcore::network::servers::{HttpServer, ServerHandle};
-use dxcore::network::services::{AttributeService, Service};
+use dxcore::network::services::{FunctionalService, Service};
 
 fn spawn_server(service: Arc<dyn Service>) -> (String, ServerHandle) {
     let server = HttpServer::bind("127.0.0.1:0", service).unwrap();
@@ -25,7 +25,7 @@ struct MarketData {}
 fn mesh_registers_locally_and_serves() {
     let mesh = MeshService::new();
 
-    let market_data = AttributeService::new("market-data", MarketData {})
+    let market_data = FunctionalService::new("market-data", MarketData {})
         .with_get("quotes", |_: &MarketData, symbol: String| {
             Ok(format!("{symbol}:42.5"))
         });

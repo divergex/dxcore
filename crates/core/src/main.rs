@@ -1,11 +1,9 @@
 mod cli;
 
 #[cfg(feature = "ibkr")]
-use std::sync::mpsc;
-#[cfg(feature = "ibkr")]
 use dxcore::interface::external::ibkr::IbkrInterface;
 #[cfg(feature = "ibkr")]
-use dxcore::interface::MarketApi;
+use dxcore::interface::AccountInterface;
 #[cfg(feature = "ibkr")]
 use dxcore::Event;
 
@@ -46,8 +44,7 @@ fn print_usage() {
 #[cfg(feature = "strategies")]
 fn run_strategies(args: &[String]) {
     use dxcore::strategies::SmaCross;
-    use dxcore::trading::{DailyView, SyncExecutor};
-    use polars::prelude::*;
+    use dxcore::trading::{BaseOrderEngine, DailyView, SyncExecutor};
 
     if args.is_empty() {
         println!("available strategies:");
@@ -60,14 +57,14 @@ fn run_strategies(args: &[String]) {
             let df = generate_ohlc(30);
             println!("=== OHLC Data ===\n{:?}\n", df.head(Some(5)));
 
-            let view = DailyView::new("date")
-                .with_col_map(vec![("close".into(), "price".into())]);
+            let view = DailyView::new("date").with_col_map(vec![("close".into(), "price".into())]);
 
+            let engine = BaseOrderEngine::new();
             let strategy = SmaCross::new(10_000.0, 5, 10);
-            let mut executor = SyncExecutor::new(strategy);
-            let signals_df = executor.run(&df, view);
+            let mut executor = SyncExecutor::new(engine, strategy);
+            let orders = executor.run(&df, view).expect("backtest failed");
 
-            println!("=== Signals ===\n{:?}", signals_df);
+            println!("=== Orders ===\n{orders:#?}");
         }
         name => {
             eprintln!("unknown strategy: {name}");
@@ -98,13 +95,23 @@ fn generate_ohlc(n_days: usize) -> polars::prelude::DataFrame {
         .enumerate()
         .map(|(i, p)| if i < n_days - 1 { prices[i + 1] } else { *p })
         .collect();
-    let highs: Vec<f64> = opens.iter().zip(closes.iter()).map(|(o, c)| o.max(*c) + 0.5).collect();
-    let lows: Vec<f64> = opens.iter().zip(closes.iter()).map(|(o, c)| o.min(*c) - 0.5).collect();
+    let highs: Vec<f64> = opens
+        .iter()
+        .zip(closes.iter())
+        .map(|(o, c)| o.max(*c) + 0.5)
+        .collect();
+    let lows: Vec<f64> = opens
+        .iter()
+        .zip(closes.iter())
+        .map(|(o, c)| o.min(*c) - 0.5)
+        .collect();
     let volumes: Vec<f64> = (0..n_days).map(|_| 10_000.0).collect();
 
     let date_col = Column::new(
         "date".into(),
-        Series::new("date".into(), dates).cast(&DataType::Date).unwrap(),
+        Series::new("date".into(), dates)
+            .cast(&DataType::Date)
+            .unwrap(),
     );
     let symbol_col = Column::new("symbol".into(), vec!["DEMO"; n_days]);
 
@@ -126,22 +133,34 @@ fn run_ibkr() {
 
     let account_id = std::env::var("IB_ACCOUNT_ID").expect("IB_ACCOUNT_ID must be set");
 
-    let (tx, rx) = mpsc::channel();
     let interface = IbkrInterface::new("127.0.0.1:7496".into(), 1);
 
-    let handle = std::thread::spawn(move || {
-        interface.listen(&account_id, tx)
-    });
+    if let Err(e) = interface.listen_async(&account_id) {
+        eprintln!("listen failed: {e}");
+        std::process::exit(1);
+    }
 
-    for event in rx {
-        match event {
-            Event::Connected => println!("Connected to IB."),
-            Event::Disconnected(e) => eprintln!("Disconnected: {e}"),
-            Event::AccountValue(av) => {
-                println!("Account: {} = {} {}", av.key, av.value, av.currency);
+    loop {
+        let events = match interface.events(&account_id) {
+            Ok(events) => events,
+            Err(e) => {
+                eprintln!("events failed: {e}");
+                std::process::exit(1);
             }
-            Event::Position(pv) => {
-                println!(
+        };
+        let disconnected = events
+            .iter()
+            .any(|event| matches!(event, Event::Disconnected(_)));
+
+        for event in events {
+            match event {
+                Event::Connected => println!("Connected to IB."),
+                Event::Disconnected(e) => eprintln!("Disconnected: {e}"),
+                Event::AccountValue(av) => {
+                    println!("Account: {} = {} {}", av.key, av.value, av.currency);
+                }
+                Event::Position(pv) => {
+                    println!(
                     "{} {} | pos={:.0} | mkt_price={:.2} | mkt_value={:.2} | avg_cost={:.2} | unreal={:.2} | real={:.2}",
                     pv.contract.symbol,
                     pv.contract.security_type,
@@ -152,30 +171,32 @@ fn run_ibkr() {
                     pv.unrealized_pnl,
                     pv.realized_pnl,
                 );
-            }
-            Event::UpdateTime(ts) => println!("Update time: {ts}"),
-            Event::HistoricalBars { contract_id, bars } => {
-                println!("\n--- Historical bars for contract {contract_id} ---");
-                for bar in &bars {
-                    println!(
-                        "  {date} | O:{open:.2} H:{high:.2} L:{low:.2} C:{close:.2} V:{vol:.0}",
-                        date = bar.date,
-                        open = bar.open,
-                        high = bar.high,
-                        low = bar.low,
-                        close = bar.close,
-                        vol = bar.volume,
-                    );
+                }
+                Event::UpdateTime(ts) => println!("Update time: {ts}"),
+                Event::HistoricalBars { contract_id, bars } => {
+                    println!("\n--- Historical bars for contract {contract_id} ---");
+                    for bar in &bars {
+                        println!(
+                            "  {date} | O:{open:.2} H:{high:.2} L:{low:.2} C:{close:.2} V:{vol:.0}",
+                            date = bar.date,
+                            open = bar.open,
+                            high = bar.high,
+                            low = bar.low,
+                            close = bar.close,
+                            vol = bar.volume,
+                        );
+                    }
+                }
+                Event::HistoricalError { contract_id, error } => {
+                    eprintln!("  Historical error for contract {contract_id}: {error}");
                 }
             }
-            Event::HistoricalError { contract_id, error } => {
-                eprintln!("  Historical error for contract {contract_id}: {error}");
-            }
         }
-    }
 
-    if let Err(e) = handle.join().expect("worker panicked") {
-        eprintln!("Worker error: {e}");
-        std::process::exit(1);
+        if disconnected {
+            return;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }

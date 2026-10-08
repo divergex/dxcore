@@ -1,17 +1,3 @@
-//! Serves a `Portfolio` over HTTP via the generic attribute service.
-//!
-//! Run with: `cargo run --example serve_portfolio -- [port]`
-//!
-//! The service exposes only the declared attributes: `metrics` is a real
-//! field (get+set via the `attribute!` macro), `net_liquidation` is a
-//! projection with a custom getter (read-only).
-//!
-//! Then:
-//! - `curl http://127.0.0.1:8080/metrics` → read the metrics map
-//! - `curl -X PUT http://127.0.0.1:8080/metrics -d '{"NetLiquidation":{"key":"NetLiquidation","value":"100000","currency":"USD"}}'`
-//! - `curl http://127.0.0.1:8080/net_liquidation` → read one metric
-//! - `curl -X PUT http://127.0.0.1:8080/net_liquidation -d 'null'` → 405 (read-only)
-
 use std::sync::Arc;
 
 use dxcore::attribute;

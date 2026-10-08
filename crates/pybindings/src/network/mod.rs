@@ -1,5 +1,3 @@
-//! Bindings for `dxcore::network`: services, the HTTP server and the mesh.
-
 pub mod mesh;
 pub mod servers;
 pub mod services;

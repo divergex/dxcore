@@ -1,5 +1,3 @@
-//! Bindings for `dxcore::interface::external` data sources.
-
 mod fmp;
 mod guardian;
 #[cfg(feature = "ibkr")]

@@ -43,12 +43,6 @@ pub fn df_to_py(py: Python<'_>, df: &DataFrame) -> PyResult<Py<PyAny>> {
     Ok(pl.getattr("read_ipc")?.call1((bytesio,))?.unbind())
 }
 
-/// A fresh empty `polars.DataFrame`, used as the default output frame.
-pub fn empty_df_py(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let pl = PyModule::import(py, "polars")?;
-    Ok(pl.call_method0("DataFrame")?.unbind())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

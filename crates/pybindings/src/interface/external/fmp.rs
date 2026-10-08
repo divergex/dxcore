@@ -1,5 +1,3 @@
-//! Financial Modeling Prep bindings.
-
 use pyo3::prelude::*;
 
 use ::dxcore::interface::external::fmp::{BalanceSheet, FmpClient, IncomeStatement, Profile};
