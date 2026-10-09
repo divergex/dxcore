@@ -161,6 +161,11 @@ impl PyInterfaceFactory {
             factory = match kind {
                 MethodKind::Get => factory.get(method, *protocol, invoke),
                 MethodKind::Set => factory.set(method, *protocol, invoke),
+                MethodKind::Post | MethodKind::Delete => {
+                    return Err(PyRuntimeError::new_err(format!(
+                        "{method}: the Python factory declares get and set methods only"
+                    )));
+                }
             };
         }
         Ok(PyInterface {

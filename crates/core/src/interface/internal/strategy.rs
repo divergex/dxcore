@@ -4,9 +4,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use polars::prelude::DataFrame;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use super::{HttpAccessor, Interface};
+use super::Interface;
 use crate::trading::{Signal, Strategy};
 use crate::Error;
 
@@ -28,10 +27,6 @@ impl StepArgs {
         let (date, frame) = self.step;
         ((date, frame.into_inner()), self.history.into_inner())
     }
-}
-
-pub fn http_on_step(accessor: &HttpAccessor, args: StepArgs) -> Result<Value, Error> {
-    accessor.set("on_step", &args)
 }
 
 pub struct StrategyInterface<O = Option<Signal>> {

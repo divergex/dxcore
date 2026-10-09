@@ -7,6 +7,10 @@ use uuid::Uuid;
 
 use crate::network::services::{Request, Response, Service, ServiceError};
 
+mod registration;
+
+pub use registration::{RegistrationBuilder, RegistrationHandle};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Protocol {
     Http,
@@ -76,27 +80,7 @@ impl MeshService {
         url: &str,
         protocol: Protocol,
     ) -> Result<String, ServiceError> {
-        let endpoints = service
-            .endpoints()
-            .into_iter()
-            .map(|path| {
-                let name = path.trim_start_matches('/').to_string();
-                (
-                    name,
-                    Endpoint {
-                        protocols: vec![protocol],
-                        description: None,
-                    },
-                )
-            })
-            .collect();
-        let registration = Registration {
-            name: service.name(),
-            url: url.to_string(),
-            protocols: vec![protocol],
-            endpoints,
-        };
-        self.insert(registration)
+        self.insert(Registration::of(&service, url, protocol))
     }
 
     fn insert(&self, registration: Registration) -> Result<String, ServiceError> {
@@ -167,6 +151,23 @@ impl MeshService {
         let registration: Registration = serde_json::from_value(value)
             .map_err(|e| ServiceError::BadValue(e.to_string()))?;
         let uuid = self.insert(registration)?;
+        Ok(Response {
+            value: json!({ "uuid": uuid }),
+        })
+    }
+
+    fn route_delete(&self, attribute: &str) -> Result<Response, ServiceError> {
+        let uuid = attribute
+            .strip_prefix("services/")
+            .filter(|uuid| !uuid.is_empty())
+            .ok_or_else(|| ServiceError::UnknownAttribute(attribute.to_string()))?;
+        let mut services = self
+            .services
+            .write()
+            .map_err(|_| ServiceError::Internal("mesh lock poisoned".into()))?;
+        services
+            .remove(uuid)
+            .ok_or_else(|| ServiceError::UnknownAttribute(format!("service {uuid}")))?;
         Ok(Response {
             value: json!({ "uuid": uuid }),
         })
@@ -248,8 +249,9 @@ impl Service for MeshService {
         match request {
             Request::Get { attribute, args: _ } => self.route_get(&attribute),
             Request::Post { attribute, value } => self.route_post(&attribute, value),
+            Request::Delete { attribute } => self.route_delete(&attribute),
             Request::Set { .. } => Err(ServiceError::WriteOnly(
-                "mesh only accepts POST /services".into(),
+                "mesh accepts POST /services and DELETE /services/<uuid>".into(),
             )),
         }
     }

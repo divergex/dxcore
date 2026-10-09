@@ -58,6 +58,26 @@ impl InterfaceFactory {
         self.register(method, protocol, MethodKind::Set, handler)
     }
 
+    pub fn post<A, Args, Ret, F>(self, method: &str, protocol: Protocol, handler: F) -> Self
+    where
+        A: Send + Sync + 'static,
+        Args: DeserializeOwned + 'static,
+        Ret: Serialize + 'static,
+        F: Fn(&A, Args) -> Result<Ret, Error> + Send + Sync + 'static,
+    {
+        self.register(method, protocol, MethodKind::Post, handler)
+    }
+
+    pub fn delete<A, Args, Ret, F>(self, method: &str, protocol: Protocol, handler: F) -> Self
+    where
+        A: Send + Sync + 'static,
+        Args: DeserializeOwned + 'static,
+        Ret: Serialize + 'static,
+        F: Fn(&A, Args) -> Result<Ret, Error> + Send + Sync + 'static,
+    {
+        self.register(method, protocol, MethodKind::Delete, handler)
+    }
+
     fn register<A, Args, Ret, F>(
         mut self,
         method: &str,

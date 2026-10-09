@@ -120,7 +120,7 @@ impl Service for PythonService {
                 };
                 (handler, value)
             }
-            Request::Post { attribute, .. } => {
+            Request::Post { attribute, .. } | Request::Delete { attribute } => {
                 return Err(CoreServiceError::WriteOnly(attribute))
             }
         };
@@ -211,6 +211,10 @@ fn request_to_py(py: Python<'_>, request: &Request) -> PyResult<Py<PyAny>> {
             dict.set_item("op", "post")?;
             dict.set_item("attribute", attribute.as_str())?;
             dict.set_item("value", value_to_py(py, value)?)?;
+        }
+        Request::Delete { attribute } => {
+            dict.set_item("op", "delete")?;
+            dict.set_item("attribute", attribute.as_str())?;
         }
     }
     Ok(dict.into_any().unbind())

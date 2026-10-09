@@ -103,6 +103,7 @@ fn dispatch(
             Ok(value) => Request::Post { attribute, value },
             Err(response) => return response,
         },
+        Method::Delete => Request::Delete { attribute },
         _ => return json_error(StatusCode(405), "method not allowed".into()),
     };
 

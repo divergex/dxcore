@@ -7,6 +7,8 @@ use crate::network::mesh::Protocol;
 pub enum MethodKind {
     Get,
     Set,
+    Post,
+    Delete,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +64,18 @@ impl ServiceSpec {
         self
     }
 
+    pub fn with_post(mut self, method: &str, protocols: &[Protocol]) -> Self {
+        self.methods
+            .insert(method.into(), MethodSpec::new(MethodKind::Post, protocols));
+        self
+    }
+
+    pub fn with_delete(mut self, method: &str, protocols: &[Protocol]) -> Self {
+        self.methods
+            .insert(method.into(), MethodSpec::new(MethodKind::Delete, protocols));
+        self
+    }
+
     pub fn method(&self, name: &str) -> Option<&MethodSpec> {
         self.methods.get(name)
     }
@@ -102,4 +116,16 @@ pub fn registry_guard() -> MutexGuard<'static, Registry> {
 
 fn register_defaults(registry: &mut Registry) {
     registry.register(ServiceSpec::new("strategy").with_set("on_step", &[Protocol::Http]));
+    registry.register(
+        ServiceSpec::new("trading")
+            .with_get("market_history", &[Protocol::Http])
+            .with_get("portfolio", &[Protocol::Http])
+            .with_get("listen_async", &[Protocol::Http])
+            .with_get("events", &[Protocol::Http]),
+    );
+    registry.register(
+        ServiceSpec::new("mesh")
+            .with_post("services", &[Protocol::Http])
+            .with_delete("unregister", &[Protocol::Http]),
+    );
 }

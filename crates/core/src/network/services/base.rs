@@ -18,6 +18,9 @@ pub enum Request {
         attribute: String,
         value: Value,
     },
+    Delete {
+        attribute: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -106,6 +109,8 @@ pub(crate) fn call_entry<T: Send + Sync + 'static>(
                 value: setter(&mut instance, value)?,
             })
         }
-        Request::Post { attribute, .. } => Err(ServiceError::WriteOnly(attribute)),
+        Request::Post { attribute, .. } | Request::Delete { attribute } => {
+            Err(ServiceError::WriteOnly(attribute))
+        }
     }
 }
