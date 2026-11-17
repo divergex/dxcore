@@ -2,6 +2,11 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+/// Identifier assigned when an order is accepted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct OrderId(pub u64);
+
 /// Direction of an order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Side {
@@ -92,7 +97,7 @@ pub struct Signal {
 }
 
 /// A validated order, as produced by an [`OrderEngine`](super::OrderEngine).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Order {
     /// Ordinal of the step that produced it, from [`View::step_ord_key`]
     /// (epoch days for [`DailyView`] and [`PanelView`]); `None` for views that
@@ -132,7 +137,10 @@ pub trait OrderIntent {
 
 impl OrderIntent for Signal {
     fn into_intent(self) -> Option<Intent> {
-        Some(Intent::Target { symbol: self.symbol, shares: self.shares })
+        Some(Intent::Target {
+            symbol: self.symbol,
+            shares: self.shares,
+        })
     }
 }
 
@@ -159,7 +167,10 @@ pub enum OrderError {
     InvalidPrice(f64),
     /// Order type and price spec disagree: a market order must carry
     /// [`OrderPrice::Mkt`], a limit or stop order a concrete price.
-    IncoherentPrice { order_type: OrderType, price: OrderPrice },
+    IncoherentPrice {
+        order_type: OrderType,
+        price: OrderPrice,
+    },
 }
 
 impl fmt::Display for OrderError {
@@ -174,10 +185,9 @@ impl fmt::Display for OrderError {
                 write!(f, "invalid order quantity: {quantity}")
             }
             OrderError::InvalidPrice(price) => write!(f, "invalid order price: {price}"),
-            OrderError::IncoherentPrice { order_type, price } => write!(
-                f,
-                "a {order_type} order cannot be specified at {price}"
-            ),
+            OrderError::IncoherentPrice { order_type, price } => {
+                write!(f, "a {order_type} order cannot be specified at {price}")
+            }
         }
     }
 }

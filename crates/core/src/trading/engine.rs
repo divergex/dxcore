@@ -41,30 +41,11 @@ pub trait OrderEngine<O, I> {
     fn append_output(&self, frame: &mut Self::Frame, order: Self::Order, step: &I);
 }
 
-/// Positions the base engine believes it holds, in shares per symbol.
 #[derive(Debug, Default)]
 pub struct BaseOrderEngineState {
     pub positions: HashMap<String, f64>,
 }
 
-/// The stock engine: [`Signal`](super::Signal) targets and
-/// [`OrderData`](super::OrderData) specs into [`Order`]s.
-///
-/// It resolves what a strategy leaves implicit and rejects what cannot be
-/// traded as stated:
-///
-/// - **Symbol**: taken from the output, else from
-///   [`BaseOrderEngine::with_symbol`].
-/// - **Size and side**: a [`Signal`](super::Signal) is diffed against the
-///   engine's position ledger, so targets are idempotent; an
-///   [`OrderData`](super::OrderData) signed quantity is split into magnitude
-///   and [`Side`], and `Abs` sizes move the ledger.
-///   [`OrderQuantity::Pct`] orders leave the ledger alone — the engine cannot
-///   turn a fraction into shares without account equity.
-/// - **Coherence**: [`OrderType::Market`] requires [`OrderPrice::Mkt`], limit
-///   and stop orders require a finite positive [`OrderPrice::Px`].
-///
-/// A zero size, an unchanged target, or a `None` output produce no order.
 #[derive(Debug, Default)]
 pub struct BaseOrderEngine {
     symbol: Option<String>,
@@ -75,7 +56,6 @@ impl BaseOrderEngine {
         Self::default()
     }
 
-    /// Instrument assumed for outputs that do not name one.
     pub fn with_symbol(mut self, symbol: impl Into<String>) -> Self {
         self.symbol = Some(symbol.into());
         self
@@ -133,7 +113,14 @@ impl<O: OrderIntent, I> OrderEngine<O, I> for BaseOrderEngine {
             }
         };
 
-        Ok(Some(Order { date, symbol, side, quantity, order_type, price }))
+        Ok(Some(Order {
+            date,
+            symbol,
+            side,
+            quantity,
+            order_type,
+            price,
+        }))
     }
 
     fn create_output(&self) -> Vec<Order> {
@@ -145,9 +132,9 @@ impl<O: OrderIntent, I> OrderEngine<O, I> for BaseOrderEngine {
     }
 }
 
-/// Splits a signed size into the signed value, its [`Side`], and the unsigned
-/// magnitude. `Ok(None)` when the size is zero: nothing to trade.
-fn split_quantity(quantity: OrderQuantity) -> Result<Option<(f64, Side, OrderQuantity)>, OrderError> {
+fn split_quantity(
+    quantity: OrderQuantity,
+) -> Result<Option<(f64, Side, OrderQuantity)>, OrderError> {
     let signed = match quantity {
         OrderQuantity::Abs(value) | OrderQuantity::Pct(value) => value,
     };

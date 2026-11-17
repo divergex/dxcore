@@ -1,5 +1,5 @@
-use std::ops::Deref;
 use polars::prelude::*;
+use std::ops::Deref;
 
 pub struct KeyedSchema {
     pub keys: Vec<String>,

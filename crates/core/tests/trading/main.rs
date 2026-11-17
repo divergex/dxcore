@@ -2,6 +2,7 @@ mod helpers;
 
 mod executor_async;
 mod executor_sync;
+mod order_book;
 mod order_engine;
 mod schema;
 mod view_daily;
