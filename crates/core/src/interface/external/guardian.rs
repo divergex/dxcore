@@ -1,5 +1,5 @@
-use reqwest::blocking::Client;
 use reqwest::Url;
+use reqwest::blocking::Client;
 use serde::Deserialize;
 
 use crate::Error;
@@ -66,11 +66,7 @@ struct ApiEnvelope<T> {
     response: T,
 }
 
-pub fn search(
-    query: &str,
-    api_key: &str,
-    page_size: usize,
-) -> Result<Vec<GuardianArticle>, Error> {
+pub fn search(query: &str, api_key: &str, page_size: usize) -> Result<Vec<GuardianArticle>, Error> {
     let url = Url::parse_with_params(
         &format!("{API_BASE}/search"),
         &[
@@ -96,10 +92,7 @@ pub fn search(
 pub fn get_article(id: &str, api_key: &str) -> Result<GuardianArticleBody, Error> {
     let url = Url::parse_with_params(
         &format!("{API_BASE}/{id}"),
-        &[
-            ("api-key", api_key),
-            ("show-blocks", "body"),
-        ],
+        &[("api-key", api_key), ("show-blocks", "body")],
     )
     .map_err(|e| Error::Http(format!("invalid URL: {e}")))?;
 

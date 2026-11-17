@@ -1,5 +1,5 @@
-use reqwest::blocking::Client;
 use reqwest::Url;
+use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -61,9 +61,13 @@ pub fn query_filings(queries: &[&str], limit: usize) -> Result<Vec<XbrlFiling>, 
 fn build_filter(queries: &[&str]) -> Vec<Value> {
     let mut or_conditions = Vec::with_capacity(queries.len() * 4);
     for &q in queries {
-        or_conditions.push(serde_json::json!({"name": "entity.name", "op": "ilike", "val": format!("%{q}%")}));
+        or_conditions.push(
+            serde_json::json!({"name": "entity.name", "op": "ilike", "val": format!("%{q}%")}),
+        );
         or_conditions.push(serde_json::json!({"name": "entity.identifier", "op": "eq", "val": q}));
-        or_conditions.push(serde_json::json!({"name": "language.name", "op": "ilike", "val": format!("{q}%")}));
+        or_conditions.push(
+            serde_json::json!({"name": "language.name", "op": "ilike", "val": format!("{q}%")}),
+        );
         or_conditions.push(serde_json::json!({"name": "sha256", "op": "eq", "val": q}));
     }
     vec![
@@ -73,8 +77,8 @@ fn build_filter(queries: &[&str]) -> Vec<Value> {
 }
 
 fn build_url(filter: &[Value], limit: usize) -> Result<Url, Error> {
-    let filter_json =
-        serde_json::to_string(filter).map_err(|e| Error::Http(format!("filter serialization: {e}")))?;
+    let filter_json = serde_json::to_string(filter)
+        .map_err(|e| Error::Http(format!("filter serialization: {e}")))?;
 
     Url::parse_with_params(
         API_URL,
@@ -113,12 +117,20 @@ fn flatten_filings(payload: JsonApiResponse) -> Vec<XbrlFiling> {
             let country = attrs
                 .and_then(|a| a.get("country"))
                 .and_then(|v| v.as_str())
-                .or_else(|| entity_attrs.and_then(|a| a.get("country")).and_then(|v| v.as_str()))
+                .or_else(|| {
+                    entity_attrs
+                        .and_then(|a| a.get("country"))
+                        .and_then(|v| v.as_str())
+                })
                 .unwrap_or("\u{2014}");
             let language = language_attrs
                 .and_then(|a| a.get("name"))
                 .and_then(|v| v.as_str())
-                .or_else(|| attrs.and_then(|a| a.get("language")).and_then(|v| v.as_str()))
+                .or_else(|| {
+                    attrs
+                        .and_then(|a| a.get("language"))
+                        .and_then(|v| v.as_str())
+                })
                 .unwrap_or("\u{2014}");
             let period_end = attrs
                 .and_then(|a| a.get("period_end"))
@@ -146,9 +158,7 @@ fn resolve_related<'a>(
     name: &str,
     lookup: &[(&str, &'a JsonApiResource)],
 ) -> Option<&'a Value> {
-    let data = rels?
-        .get(name)?
-        .get("data")?;
+    let data = rels?.get(name)?.get("data")?;
     let rel_type = data.get("type")?.as_str()?;
     let rel_id = data.get("id")?.as_str()?;
     lookup

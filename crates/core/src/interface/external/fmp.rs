@@ -24,7 +24,9 @@ impl FmpClient {
     pub fn profile(&self, symbol: &str) -> Result<Profile, Error> {
         let url = format!("{BASE_URL}/profile?symbol={symbol}&apikey={}", self.api_key);
         let mut results = get::<Profile>(&url)?;
-        results.pop().ok_or_else(|| Error::Http(format!("no profile found for {symbol}")))
+        results
+            .pop()
+            .ok_or_else(|| Error::Http(format!("no profile found for {symbol}")))
     }
 
     /// Annual balance sheet statements (most recent first).

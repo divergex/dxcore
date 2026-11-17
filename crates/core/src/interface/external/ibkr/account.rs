@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::thread;
 
-use ibapi::accounts::types::AccountId;
 use ibapi::accounts::AccountUpdate;
+use ibapi::accounts::types::AccountId;
 use ibapi::contracts::Contract;
 use ibapi::market_data::historical::{BarSize as IbapiBarSize, ToDuration, WhatToShow};
 
