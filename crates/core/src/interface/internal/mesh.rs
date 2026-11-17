@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::Deserialize;
 
 use super::Interface;
-use crate::network::mesh::Registration;
 use crate::Error;
+use crate::network::mesh::Registration;
 
 /// The local side of a served mesh: registering services and removing them
 /// again, over whatever protocol the [`Interface`] speaks.
