@@ -45,7 +45,7 @@ impl PyExecutor {
         };
         let strategy = PyStrategy::new(self.strategy.clone_ref(py));
         let mut executor = SyncExecutor::new(engine, strategy);
-        let frame = executor.run(&df, view.to_core());
+        let frame = executor.run_static(&df, view.to_core());
 
         // A stashed Python error (a bogus strategy output, or an exception from
         // `on_step`) wins over `Ok`/`Err` from the run.

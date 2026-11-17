@@ -62,7 +62,7 @@ fn run_strategies(args: &[String]) {
             let engine = BaseOrderEngine::new();
             let strategy = SmaCross::new(10_000.0, 5, 10);
             let mut executor = SyncExecutor::new(engine, strategy);
-            let orders = executor.run(&df, view).expect("backtest failed");
+            let orders = executor.run_static(&df, view).expect("backtest failed");
 
             println!("=== Orders ===\n{orders:#?}");
         }

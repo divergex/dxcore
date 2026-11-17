@@ -46,7 +46,7 @@ fn target_signal_produces_delta_orders() {
     ]);
 
     let mut executor = SyncExecutor::new(BaseOrderEngine::new().with_symbol("AAPL"), script);
-    let orders = executor.run(&df, view).unwrap();
+    let orders = executor.run_static(&df, view).unwrap();
 
     assert_eq!(orders.len(), 2, "unchanged target must not trade: {orders:?}");
     assert_eq!(orders[0], dxcore::trading::Order {
@@ -339,7 +339,7 @@ fn tick_view_steps_carry_no_ordinal() {
     let df = helpers::ohlc_df();
 
     let mut executor = SyncExecutor::new(BaseOrderEngine::new().with_symbol("AAPL"), BuyOnce);
-    let orders = executor.run(&df, TickView::new("date")).unwrap();
+    let orders = executor.run_static(&df, TickView::new("date")).unwrap();
 
     assert_eq!(orders.len(), 1);
     assert_eq!(orders[0].date, None);
@@ -366,7 +366,7 @@ fn engine_errors_stop_the_backtest() {
 
     let df = helpers::ohlc_df();
     let mut executor = SyncExecutor::new(BaseOrderEngine::new(), BadOrder);
-    let err = executor.run(&df, TickView::new("date")).unwrap_err();
+    let err = executor.run_static(&df, TickView::new("date")).unwrap_err();
 
     assert_eq!(
         err,

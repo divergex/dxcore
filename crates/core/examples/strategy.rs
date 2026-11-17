@@ -12,7 +12,7 @@ fn main() {
     let strategy = SmaCross::new(10_000.0, 5, 10);
     let mut executor = SyncExecutor::new(engine, strategy);
 
-    let orders = executor.run(&df, daily_view()).expect("backtest failed");
+    let orders = executor.run_static(&df, daily_view()).expect("backtest failed");
 
     println!("=== Orders ===\n{orders:#?}");
 }

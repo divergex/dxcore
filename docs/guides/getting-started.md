@@ -84,7 +84,7 @@ let df = dxcore::DataFrame::new(polars::prelude::DataFrame::new(vec![
 
 let engine = BaseOrderEngine::new().with_symbol("AAPL");
 let mut executor = SyncExecutor::new(engine, BuyOnce);
-let orders = executor.run(&df, TickView::new("ts")).unwrap();
+let orders = executor.run_static(&df, TickView::new("ts")).unwrap();
 
 assert_eq!(orders.len(), 1);
 assert_eq!(orders[0].symbol, "AAPL");
@@ -144,6 +144,57 @@ Anything it cannot accept comes back as an `OrderError` (missing instrument, non
 ```bash
 cargo run --example strategy --features strategies
 ```
+
+## Backtesting
+
+`BacktestInterface` takes a `View` (and an optional tick size via `with_tick_size`). The view owns the dataset's timestamp and column layout; the interface stores the view's steps, advances through them with the `step` helper, and exposes them through the `listen` iterator as `BacktestStep` values containing the view input, current frame, and timestamp. Market data is available through `market_history` and `quote`. Orders are matched by `trading::OrderBook` and tracked through `OrderInterface`; `on_order_update` registers a callback. A midprice-only dataset yields one synthetic quote level with `bid == ask`.
+
+`QuoteSchema` controls how bid/ask, numbered book levels, or a single midprice column are read from the current view step.
+
+## Serving a backtest
+
+A backtest can stay local or become a service without changing the client code: `BacktestService` hosts the interface and `TradingProxy` implements the same traits against the served one. Naming follows the role: `Interface` is the local object, `Service` hosts it, and `Proxy` is the local stand-in that forwards to a service. The same scheme applies to any trading object, so a proxy can connect to a backtest, a broker adapter, or another served interface.
+
+```rust,no_run
+use std::sync::Arc;
+
+use dxcore::interface::{BacktestInterface, BacktestService, OrderInterface, TradingProxy};
+use dxcore::network::servers::HttpServer;
+use dxcore::trading::{
+    DailyView, Order, OrderPrice, OrderQuantity, OrderType, Side,
+};
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let history = polars::prelude::DataFrame::empty();
+let backtest = BacktestInterface::new(history, DailyView::new("date"));
+
+let server = HttpServer::bind(
+    "127.0.0.1:0",
+    Arc::new(BacktestService::new(backtest).service()),
+)?;
+let addr = server.addr();
+let handle = server.spawn();
+
+let proxy = TradingProxy::connect(format!("http://{addr}"))?;
+let order = Order {
+    date: None,
+    symbol: "DEMO".into(),
+    side: Side::Buy,
+    quantity: OrderQuantity::Abs(1.0),
+    order_type: OrderType::Market,
+    price: OrderPrice::Mkt,
+};
+proxy.submit_order(order)?; // POST /submit_order creates an order
+let step = proxy.step::<(i32, polars::prelude::DataFrame)>()?; // PUT /step advances
+# let _ = step;
+# handle.stop()?;
+# Ok(())
+# }
+```
+
+The service exposes `market_history`, `quote`, `submit_order` (`POST`), `orders`, `executions`, and the backtest clock (`PUT step`, `GET now`). It deliberately does not serve `portfolio`: account state stays in the account service and is read-only from a trading interface. Each hosted backtest owns one cursor, so a run takes exactly one client.
+
+`listen` yields only the current view entry (`BacktestStep { input, frame, timestamp }`), never the accumulated history; executors build history client-side by appending each step frame.
 
 ## Where to go next
 

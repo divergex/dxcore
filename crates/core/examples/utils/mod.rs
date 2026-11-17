@@ -7,12 +7,23 @@ use serde::Serialize;
 
 use dxcore::interface::internal::StepArgs;
 use dxcore::network::servers::{HttpServer, ServerHandle};
-use dxcore::network::services::{FunctionalService, ServiceError};
+use dxcore::network::services::{FunctionalService, Service, ServiceError};
 use dxcore::trading::{DailyView, Strategy};
 
-struct Runner<S: Strategy> {
-    strategy: S,
-    state: S::State,
+pub fn strategy_service<S>(strategy: S) -> Arc<dyn Service>
+where
+    S: Strategy<Input = (i32, DataFrame)> + Send + Sync + 'static,
+    S::State: Send + Sync + 'static,
+    S::Output: Serialize + Send + Sync + 'static,
+{
+    let service = FunctionalService::new("strategy", (strategy, S::State::default())).with_set(
+        "on_step",
+        |(s, state): &mut (S, S::State), args: StepArgs| {
+            let (step, history) = args.into_parts();
+            Ok(s.on_step(&step, &history, state))
+        },
+    );
+    Arc::new(service)
 }
 
 pub fn serve<S>(strategy: S) -> Result<(String, ServerHandle), ServiceError>
@@ -21,21 +32,7 @@ where
     S::State: Send + Sync + 'static,
     S::Output: Serialize + Send + Sync + 'static,
 {
-    let runner = Runner {
-        strategy,
-        state: S::State::default(),
-    };
-    let service = FunctionalService::new("strategy", runner).with_set(
-        "on_step",
-        |runner: &mut Runner<S>, args: StepArgs| {
-            let (step, history) = args.into_parts();
-            Ok(runner
-                .strategy
-                .on_step(&step, &history, &mut runner.state))
-        },
-    );
-
-    let server = HttpServer::bind("127.0.0.1:0", Arc::new(service))?;
+    let server = HttpServer::bind("127.0.0.1:0", strategy_service(strategy))?;
     let addr = server.addr();
     let handle = server.spawn();
     Ok((format!("http://{addr}"), handle))

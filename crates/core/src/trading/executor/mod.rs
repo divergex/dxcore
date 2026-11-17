@@ -1,5 +1,5 @@
-mod sync;
 mod async_;
+mod sync;
 
 pub use async_::AsyncExecutor;
 pub use sync::SyncExecutor;

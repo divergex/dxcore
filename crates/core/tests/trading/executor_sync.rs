@@ -51,7 +51,7 @@ impl<I> OrderEngine<u32, I> for PassThrough {
 fn returns_frame() {
     let df = helpers::ohlc_df();
     let mut executor = SyncExecutor::new(PassThrough, CountStrategy);
-    let frame = executor.run(&df, TickView::new("date")).unwrap();
+    let frame = executor.run_static(&df, TickView::new("date")).unwrap();
     assert_eq!(frame, vec![1, 2, 3, 4, 5]);
 }
 
@@ -59,7 +59,7 @@ fn returns_frame() {
 fn empty_df_yields_empty_frame() {
     let df = helpers::empty_ohlc_df();
     let mut executor = SyncExecutor::new(PassThrough, CountStrategy);
-    let frame = executor.run(&df, TickView::new("date")).unwrap();
+    let frame = executor.run_static(&df, TickView::new("date")).unwrap();
     assert!(frame.is_empty());
 }
 
@@ -68,11 +68,11 @@ fn reusable_across_datasets() {
     let df1 = helpers::ohlc_df();
     let mut executor = SyncExecutor::new(PassThrough, CountStrategy);
 
-    let frame1 = executor.run(&df1, TickView::new("date")).unwrap();
+    let frame1 = executor.run_static(&df1, TickView::new("date")).unwrap();
     assert_eq!(frame1.len(), 5);
 
     let df2 = helpers::empty_ohlc_df();
-    let frame2 = executor.run(&df2, TickView::new("date")).unwrap();
+    let frame2 = executor.run_static(&df2, TickView::new("date")).unwrap();
     assert!(frame2.is_empty());
 }
 

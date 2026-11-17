@@ -62,10 +62,7 @@ impl<E, S: Strategy> AsyncExecutor<E, S> {
         {
             type Item = Result<OutputRow<E2::Order>, OrderError>;
 
-            fn poll_next(
-                self: Pin<&mut Self>,
-                cx: &mut Context<'_>,
-            ) -> Poll<Option<Self::Item>> {
+            fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
                 let this = unsafe { self.get_unchecked_mut() };
                 loop {
                     match Pin::new(&mut this.stream).poll_next(cx) {
@@ -73,16 +70,13 @@ impl<E, S: Strategy> AsyncExecutor<E, S> {
                             let output =
                                 this.strategy.on_step(&step, &this.history, &mut this.state);
                             let date = this.view.step_ord_key(&step);
-                            let order = this.engine.transform(
-                                output,
-                                &step,
-                                date,
-                                &mut this.engine_state,
-                            );
+                            let order =
+                                this.engine
+                                    .transform(output, &step, date, &mut this.engine_state);
                             this.view.append(&mut this.history, &step);
                             match order {
                                 Ok(Some(order)) => {
-                                    return Poll::Ready(Some(Ok(OutputRow { output: order })))
+                                    return Poll::Ready(Some(Ok(OutputRow { output: order })));
                                 }
                                 Ok(None) => continue,
                                 Err(err) => return Poll::Ready(Some(Err(err))),
@@ -149,10 +143,7 @@ impl<E, S: StrategyBase> AsyncExecutor<E, S> {
         {
             type Item = Result<OutputRow<E2::Order>, OrderError>;
 
-            fn poll_next(
-                self: Pin<&mut Self>,
-                cx: &mut Context<'_>,
-            ) -> Poll<Option<Self::Item>> {
+            fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
                 let this = unsafe { self.get_unchecked_mut() };
 
                 'scan: loop {
@@ -182,7 +173,7 @@ impl<E, S: StrategyBase> AsyncExecutor<E, S> {
 
                                 match order {
                                     Ok(Some(order)) => {
-                                        return Poll::Ready(Some(Ok(OutputRow { output: order })))
+                                        return Poll::Ready(Some(Ok(OutputRow { output: order })));
                                     }
                                     Err(err) => return Poll::Ready(Some(Err(err))),
                                     Ok(None) => continue 'scan,
