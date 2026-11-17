@@ -1,7 +1,7 @@
 use futures::{Future, Stream};
 use std::pin::Pin;
 use std::time::Duration;
-use tokio_stream::{wrappers::IntervalStream, StreamExt};
+use tokio_stream::{StreamExt, wrappers::IntervalStream};
 
 /// Polls `f` at `period` intervals, yielding each result as a [`Stream`] item.
 ///

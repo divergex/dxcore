@@ -4,6 +4,8 @@ use jiff::Span;
 use polars::prelude::*;
 
 use crate::core::{Instrument, Portfolio};
+use crate::interface::order::OrderInterface;
+use crate::interface::quote::Quote;
 use crate::{Error, Event};
 
 pub trait MarketInterface {
@@ -13,6 +15,17 @@ pub trait MarketInterface {
         bar_size: Span,
         duration: Span,
     ) -> PolarsResult<DataFrame>;
+
+    /// Best bid/ask book for `contract`, with at most `levels` levels.
+    ///
+    /// Returns `Ok(None)` when the interface cannot supply the requested number
+    /// of levels. Implementations without a quote feed return an error by
+    /// default.
+    fn quote(&self, _contract: &Instrument, _levels: usize) -> Result<Option<Quote>, Error> {
+        Err(Error::Interface(
+            "market quotes are not supported by this interface".into(),
+        ))
+    }
 }
 
 pub trait AccountInterface {
@@ -25,8 +38,6 @@ pub trait AccountInterface {
     /// Drains the events recorded by [`listen_async`](Self::listen_async).
     fn events(&self, account_id: &str) -> Result<Vec<Event>, Error>;
 }
-
-pub trait OrderInterface {}
 
 pub trait TradingInterface: MarketInterface + AccountInterface + OrderInterface {}
 

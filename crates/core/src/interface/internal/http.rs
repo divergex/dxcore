@@ -1,12 +1,14 @@
 use reqwest::blocking::{Client, RequestBuilder};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use super::strategy::StepArgs;
 use super::trading::HistoryArgs;
-use crate::network::mesh::Registration;
 use crate::Error;
+use crate::interface::QuoteArgs;
+use crate::network::mesh::Registration;
+use crate::trading::Order;
 
 pub struct HttpAccessor {
     client: Client,
@@ -106,6 +108,30 @@ pub fn http_listen_async(accessor: &HttpAccessor, account_id: String) -> Result<
 
 pub fn http_events(accessor: &HttpAccessor, account_id: String) -> Result<Value, Error> {
     accessor.get("events", &account_id)
+}
+
+pub fn http_quote(accessor: &HttpAccessor, args: QuoteArgs) -> Result<Value, Error> {
+    accessor.get("quote", &args)
+}
+
+pub fn http_submit_order(accessor: &HttpAccessor, order: Order) -> Result<Value, Error> {
+    accessor.post("submit_order", &order)
+}
+
+pub fn http_orders(accessor: &HttpAccessor, _: ()) -> Result<Value, Error> {
+    accessor.get("orders", &())
+}
+
+pub fn http_executions(accessor: &HttpAccessor, _: ()) -> Result<Value, Error> {
+    accessor.get("executions", &())
+}
+
+pub fn http_now(accessor: &HttpAccessor, _: ()) -> Result<Value, Error> {
+    accessor.get("now", &())
+}
+
+pub fn http_step(accessor: &HttpAccessor, _: ()) -> Result<Value, Error> {
+    accessor.set("step", &())
 }
 
 pub fn http_register(accessor: &HttpAccessor, registration: Registration) -> Result<Value, Error> {

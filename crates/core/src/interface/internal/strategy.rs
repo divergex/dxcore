@@ -6,8 +6,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use super::Interface;
-use crate::trading::{Signal, Strategy};
 use crate::Error;
+use crate::trading::{Signal, Strategy};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepArgs {
