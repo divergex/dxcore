@@ -9,7 +9,10 @@ pub struct TickView {
 
 impl TickView {
     pub fn new(timestamp_col: impl Into<String>) -> Self {
-        Self { timestamp_col: timestamp_col.into(), col_map: Vec::new() }
+        Self {
+            timestamp_col: timestamp_col.into(),
+            col_map: Vec::new(),
+        }
     }
 
     pub fn with_col_map(mut self, map: Vec<(String, String)>) -> Self {
@@ -38,7 +41,44 @@ impl View for TickView {
         if history.width() == 0 {
             *history = step.clone();
         } else {
-            history.vstack_mut(step).expect("failed to append tick step to history");
+            history
+                .vstack_mut(step)
+                .expect("failed to append tick step to history");
         }
+    }
+
+    fn frame<'a>(&self, step: &'a DataFrame) -> &'a DataFrame {
+        step
+    }
+
+    fn step_timestamp(&self, step: &DataFrame) -> Option<i64> {
+        let column = self
+            .col_map
+            .iter()
+            .find(|(from, _)| from == &self.timestamp_col)
+            .map(|(_, to)| to.as_str())
+            .unwrap_or(&self.timestamp_col);
+        timestamp_at(step, column)
+    }
+}
+
+fn timestamp_at(df: &DataFrame, column: &str) -> Option<i64> {
+    let series = df.column(column).ok()?.as_materialized_series();
+    match series.dtype() {
+        DataType::Date => series.date().ok()?.get(0).map(i64::from),
+        DataType::Datetime(_, _) => series.datetime().ok()?.get(0),
+        DataType::Int8 => series.i8().ok()?.get(0).map(i64::from),
+        DataType::Int16 => series.i16().ok()?.get(0).map(i64::from),
+        DataType::Int32 => series.i32().ok()?.get(0).map(i64::from),
+        DataType::Int64 => series.i64().ok()?.get(0),
+        DataType::UInt8 => series.u8().ok()?.get(0).map(i64::from),
+        DataType::UInt16 => series.u16().ok()?.get(0).map(i64::from),
+        DataType::UInt32 => series.u32().ok()?.get(0).map(i64::from),
+        DataType::UInt64 => series
+            .u64()
+            .ok()?
+            .get(0)
+            .and_then(|value| i64::try_from(value).ok()),
+        _ => None,
     }
 }

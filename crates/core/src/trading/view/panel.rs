@@ -81,6 +81,10 @@ impl View for PanelView {
         }
     }
 
+    fn frame<'a>(&self, step: &'a PanelStep) -> &'a DataFrame {
+        &step.data
+    }
+
     fn step_ord_key(&self, step: &PanelStep) -> Option<i64> {
         Some(step.date as i64)
     }
