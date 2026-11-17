@@ -63,6 +63,31 @@ impl<T: Send + Sync + 'static> ClassService<T> {
         self.functions = self.functions.with_set(name, method);
         self
     }
+
+    pub fn with_post<Args, Ret>(
+        mut self,
+        name: &str,
+        method: impl Fn(&mut T, Args) -> Result<Ret, ServiceError> + Send + Sync + 'static,
+    ) -> Self
+    where
+        Args: DeserializeOwned + Send + Sync + 'static,
+        Ret: Serialize + Send + Sync + 'static,
+    {
+        self.functions = self.functions.with_post(name, method);
+        self
+    }
+
+    pub fn with_delete<Ret>(
+        mut self,
+        name: &str,
+        method: impl Fn(&mut T) -> Result<Ret, ServiceError> + Send + Sync + 'static,
+    ) -> Self
+    where
+        Ret: Serialize + Send + Sync + 'static,
+    {
+        self.functions = self.functions.with_delete(name, method);
+        self
+    }
 }
 
 impl<T: Send + Sync + 'static> Service for ClassService<T> {

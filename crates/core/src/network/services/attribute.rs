@@ -123,6 +123,8 @@ impl<T: Send + Sync + 'static> AttributeService<T> {
                 });
                 erased
             }),
+            post: None,
+            delete: None,
         };
         self.entries.insert(name.to_string(), entry);
         self

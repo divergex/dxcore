@@ -4,7 +4,8 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use ::dxcore::network::mesh::{Endpoint, MeshService, Protocol, Registration};
+use ::dxcore::network::mesh::{Endpoint, MeshService, Registration};
+use ::dxcore::network::Protocol;
 
 use super::services::{into_service, to_py_err};
 

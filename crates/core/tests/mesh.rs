@@ -5,7 +5,8 @@ use std::sync::Arc;
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
 
-use dxcore::network::mesh::{MeshService, Protocol, Registration};
+use dxcore::network::mesh::{MeshService, Registration};
+use dxcore::network::Protocol;
 use dxcore::network::servers::{HttpServer, ServerHandle};
 use dxcore::network::services::{
     FunctionalService, Request, Response, Service, ServiceError,

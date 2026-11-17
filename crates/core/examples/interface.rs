@@ -3,7 +3,7 @@ mod utils;
 use polars::prelude::DataFrame;
 
 use dxcore::interface::internal::{http_on_step, HttpAccessor, InterfaceFactory, StrategyInterface};
-use dxcore::network::mesh::Protocol;
+use dxcore::network::Protocol;
 use dxcore::strategies::SmaCross;
 use dxcore::trading::{Signal, Strategy, View};
 use utils::{daily_view, generate_ohlc, serve};

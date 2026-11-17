@@ -2,13 +2,13 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use super::registry::{registry_guard, MethodKind};
-use crate::network::mesh::Protocol;
+use super::registry::{MethodKind, registry_guard};
 use crate::Error;
+use crate::network::protocol::Protocol;
 
 struct Handler {
     invoke: Box<dyn Fn(Value) -> Result<Value, Error> + Send + Sync>,
@@ -108,8 +108,7 @@ impl InterfaceFactory {
                         ))
                     })?;
                     let ret = handler(accessor, args)?;
-                    serde_json::to_value(ret)
-                        .map_err(|e| Error::Interface(format!("{label}: {e}")))
+                    serde_json::to_value(ret).map_err(|e| Error::Interface(format!("{label}: {e}")))
                 }),
             })
         });
@@ -131,9 +130,9 @@ impl InterfaceFactory {
 
         let mut handlers = HashMap::with_capacity(methods.len());
         for (method, protocol, kind, binder) in methods {
-            let declared = spec.method(&method).ok_or_else(|| {
-                Error::Interface(format!("{service} has no method {method}"))
-            })?;
+            let declared = spec
+                .method(&method)
+                .ok_or_else(|| Error::Interface(format!("{service} has no method {method}")))?;
             if declared.kind() != kind {
                 return Err(Error::Interface(format!(
                     "{service}.{method} is a {:?} method, registered as a {kind:?}",

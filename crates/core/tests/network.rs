@@ -246,3 +246,43 @@ fn class_service_composes_attributes_and_methods() {
 
     handle.stop().unwrap();
 }
+
+#[test]
+fn class_service_serves_post_and_delete() {
+    let service = ClassService::new("counter", Counter { value: 0 })
+        .with_get("value", |c: &Counter, _: ()| Ok(c.value))
+        .with_post("items", |c: &mut Counter, item: String| {
+            c.value += 1;
+            Ok(item)
+        })
+        .with_delete("items", |c: &mut Counter| {
+            c.value = 0;
+            Ok(true)
+        });
+    let (base, handle) = spawn_server(Arc::new(service));
+    let c = client();
+
+    let resp = c
+        .post(format!("{base}/items"))
+        .body("\"alpha\"")
+        .header("Content-Type", "application/json")
+        .send()
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.text().unwrap(), "\"alpha\"");
+
+    let resp = c.get(format!("{base}/value")).send().unwrap();
+    assert_eq!(resp.text().unwrap(), "1");
+
+    let resp = c.delete(format!("{base}/items")).send().unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.text().unwrap(), "true");
+
+    let resp = c.get(format!("{base}/value")).send().unwrap();
+    assert_eq!(resp.text().unwrap(), "0");
+
+    let resp = c.delete(format!("{base}/value")).send().unwrap();
+    assert_eq!(resp.status(), 405);
+
+    handle.stop().unwrap();
+}

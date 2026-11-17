@@ -68,9 +68,24 @@ pub(crate) type Getter<T> =
 
 pub(crate) type Setter<T> = Arc<dyn Fn(&mut T, Value) -> Result<Value, ServiceError> + Send + Sync>;
 
+pub(crate) type Deleter<T> = Arc<dyn Fn(&mut T) -> Result<Value, ServiceError> + Send + Sync>;
+
 pub(crate) struct Entry<T> {
     pub(crate) get: Option<Getter<T>>,
     pub(crate) set: Option<Setter<T>>,
+    pub(crate) post: Option<Setter<T>>,
+    pub(crate) delete: Option<Deleter<T>>,
+}
+
+impl<T> Entry<T> {
+    pub(crate) fn empty() -> Self {
+        Self {
+            get: None,
+            set: None,
+            post: None,
+            delete: None,
+        }
+    }
 }
 
 pub(crate) fn call_entry<T: Send + Sync + 'static>(
@@ -109,8 +124,35 @@ pub(crate) fn call_entry<T: Send + Sync + 'static>(
                 value: setter(&mut instance, value)?,
             })
         }
-        Request::Post { attribute, .. } | Request::Delete { attribute } => {
-            Err(ServiceError::WriteOnly(attribute))
+        Request::Post { attribute, value } => {
+            let entry = entries
+                .get(&attribute)
+                .ok_or_else(|| ServiceError::UnknownAttribute(attribute.clone()))?;
+            let poster = entry
+                .post
+                .as_ref()
+                .ok_or_else(|| ServiceError::WriteOnly(attribute))?;
+            let mut instance = instance
+                .write()
+                .map_err(|_| ServiceError::Internal("instance lock poisoned".into()))?;
+            Ok(Response {
+                value: poster(&mut instance, value)?,
+            })
+        }
+        Request::Delete { attribute } => {
+            let entry = entries
+                .get(&attribute)
+                .ok_or_else(|| ServiceError::UnknownAttribute(attribute.clone()))?;
+            let deleter = entry
+                .delete
+                .as_ref()
+                .ok_or_else(|| ServiceError::WriteOnly(attribute))?;
+            let mut instance = instance
+                .write()
+                .map_err(|_| ServiceError::Internal("instance lock poisoned".into()))?;
+            Ok(Response {
+                value: deleter(&mut instance)?,
+            })
         }
     }
 }

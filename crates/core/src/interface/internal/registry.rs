@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
-use crate::network::mesh::Protocol;
+use crate::network::protocol::Protocol;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MethodKind {
@@ -71,8 +71,10 @@ impl ServiceSpec {
     }
 
     pub fn with_delete(mut self, method: &str, protocols: &[Protocol]) -> Self {
-        self.methods
-            .insert(method.into(), MethodSpec::new(MethodKind::Delete, protocols));
+        self.methods.insert(
+            method.into(),
+            MethodSpec::new(MethodKind::Delete, protocols),
+        );
         self
     }
 
@@ -81,7 +83,9 @@ impl ServiceSpec {
     }
 
     pub fn methods(&self) -> impl Iterator<Item = (&str, &MethodSpec)> {
-        self.methods.iter().map(|(name, spec)| (name.as_str(), spec))
+        self.methods
+            .iter()
+            .map(|(name, spec)| (name.as_str(), spec))
     }
 }
 
@@ -119,9 +123,15 @@ fn register_defaults(registry: &mut Registry) {
     registry.register(
         ServiceSpec::new("trading")
             .with_get("market_history", &[Protocol::Http])
+            .with_get("quote", &[Protocol::Http])
+            .with_post("submit_order", &[Protocol::Http])
+            .with_get("orders", &[Protocol::Http])
+            .with_get("executions", &[Protocol::Http])
             .with_get("portfolio", &[Protocol::Http])
             .with_get("listen_async", &[Protocol::Http])
-            .with_get("events", &[Protocol::Http]),
+            .with_get("events", &[Protocol::Http])
+            .with_set("step", &[Protocol::Http])
+            .with_get("now", &[Protocol::Http]),
     );
     registry.register(
         ServiceSpec::new("mesh")

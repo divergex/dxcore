@@ -7,7 +7,7 @@ use serde_json::Value;
 use ::dxcore::interface::internal::{
     registry_guard, HttpAccessor, Interface, InterfaceFactory, MethodKind, ServiceSpec,
 };
-use ::dxcore::network::mesh::Protocol;
+use ::dxcore::network::Protocol;
 use ::dxcore::Error;
 
 use crate::network::mesh::PyProtocol;

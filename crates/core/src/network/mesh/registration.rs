@@ -6,7 +6,8 @@ use reqwest::blocking::Client;
 use crate::interface::internal::{
     http_register, http_unregister, HttpAccessor, InterfaceFactory, MeshInterface,
 };
-use crate::network::mesh::{Endpoint, Protocol, Registration};
+use crate::network::mesh::{Endpoint, Registration};
+use crate::network::protocol::Protocol;
 use crate::network::services::Service;
 use crate::Error;
 
@@ -57,10 +58,7 @@ pub struct RegistrationBuilder {
 }
 
 impl RegistrationBuilder {
-    pub fn new<S>(service: Arc<S>, url: impl Into<String>) -> Self
-    where
-        S: Service + 'static,
-    {
+    pub fn new(service: Arc<dyn Service>, url: impl Into<String>) -> Self {
         Self {
             service,
             url: url.into(),

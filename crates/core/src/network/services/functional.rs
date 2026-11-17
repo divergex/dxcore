@@ -5,7 +5,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
 
-use super::base::{call_entry, Entry, Getter, Request, Response, Service, ServiceError, Setter};
+use super::base::{
+    call_entry, Deleter, Entry, Getter, Request, Response, Service, ServiceError, Setter,
+};
 use crate::serialization::{from_value, to_value};
 
 pub struct FunctionalService<T> {
@@ -45,19 +47,15 @@ impl<T: Send + Sync + 'static> FunctionalService<T> {
         Ret: Serialize + Send + Sync + 'static,
     {
         let erased: Getter<T> = Arc::new(move |t: &T, args: Option<Value>| {
-            let args =
-                args.ok_or_else(|| ServiceError::BadValue("method requires arguments".into()))?;
+            let args = args.unwrap_or(Value::Null);
             let args: Args = from_value(args).map_err(|e| ServiceError::BadValue(e.to_string()))?;
             let ret = method(t, args)?;
             to_value(&ret).map_err(|e| ServiceError::BadValue(e.to_string()))
         });
-        self.entries.insert(
-            name.to_string(),
-            Entry {
-                get: Some(erased),
-                set: None,
-            },
-        );
+        self.entries
+            .entry(name.to_string())
+            .or_insert_with(Entry::empty)
+            .get = Some(erased);
         self
     }
 
@@ -75,13 +73,50 @@ impl<T: Send + Sync + 'static> FunctionalService<T> {
             let ret = method(t, args)?;
             to_value(&ret).map_err(|e| ServiceError::BadValue(e.to_string()))
         });
-        self.entries.insert(
-            name.to_string(),
-            Entry {
-                get: None,
-                set: Some(erased),
-            },
-        );
+        self.entries
+            .entry(name.to_string())
+            .or_insert_with(Entry::empty)
+            .set = Some(erased);
+        self
+    }
+
+    pub fn with_post<Args, Ret>(
+        mut self,
+        name: &str,
+        method: impl Fn(&mut T, Args) -> Result<Ret, ServiceError> + Send + Sync + 'static,
+    ) -> Self
+    where
+        Args: DeserializeOwned + Send + Sync + 'static,
+        Ret: Serialize + Send + Sync + 'static,
+    {
+        let erased: Setter<T> = Arc::new(move |t: &mut T, args: Value| {
+            let args: Args = from_value(args).map_err(|e| ServiceError::BadValue(e.to_string()))?;
+            let ret = method(t, args)?;
+            to_value(&ret).map_err(|e| ServiceError::BadValue(e.to_string()))
+        });
+        self.entries
+            .entry(name.to_string())
+            .or_insert_with(Entry::empty)
+            .post = Some(erased);
+        self
+    }
+
+    pub fn with_delete<Ret>(
+        mut self,
+        name: &str,
+        method: impl Fn(&mut T) -> Result<Ret, ServiceError> + Send + Sync + 'static,
+    ) -> Self
+    where
+        Ret: Serialize + Send + Sync + 'static,
+    {
+        let erased: Deleter<T> = Arc::new(move |t: &mut T| {
+            let ret = method(t)?;
+            to_value(&ret).map_err(|e| ServiceError::BadValue(e.to_string()))
+        });
+        self.entries
+            .entry(name.to_string())
+            .or_insert_with(Entry::empty)
+            .delete = Some(erased);
         self
     }
 }

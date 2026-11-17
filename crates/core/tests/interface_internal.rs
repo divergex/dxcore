@@ -7,7 +7,7 @@ use dxcore::interface::internal::{
     http_on_step, registry_guard, HttpAccessor, InterfaceFactory, MethodKind, ServiceSpec,
     StepArgs, StrategyInterface,
 };
-use dxcore::network::mesh::Protocol;
+use dxcore::network::Protocol;
 use dxcore::network::servers::{HttpServer, ServerHandle};
 use dxcore::network::services::FunctionalService;
 use dxcore::trading::{Signal, Strategy};
